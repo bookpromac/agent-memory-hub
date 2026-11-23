@@ -1,0 +1,18 @@
+{
+  "name": "agent-memory-hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "跨智能体记忆中枢：Markdown 为事实源，MCP 为协议，任何 agent 可读写",
+  "bin": {
+    "memhub": "src/cli.mjs",
+    "memhub-mcp": "src/mcp.mjs"
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs",
+    "mcp": "node src/mcp.mjs"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}

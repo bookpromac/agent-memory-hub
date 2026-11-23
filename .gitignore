@@ -1,0 +1,6 @@
+node_modules/
+index.sqlite
+index.sqlite-wal
+index.sqlite-shm
+*.tmp-*
+.DS_Store
