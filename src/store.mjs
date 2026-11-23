@@ -216,6 +216,22 @@ export class MemoryStore {
   }
 
   #migrate() {
+    const exists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='notes'").get();
+    let version = null;
+    if (exists) {
+      try {
+        const r = this.db.prepare("SELECT value FROM meta WHERE key='schema_version'").get();
+        version = r ? Number(r.value) : null;
+      } catch { version = null; }
+    }
+    const needsUpgrade = Boolean(exists) && version !== SCHEMA_VERSION;
+    if (needsUpgrade) {
+      // 索引全部是派生数据，直接重建；Markdown 不受影响
+      this.db.exec(`DROP TABLE IF EXISTS notes; DROP TABLE IF EXISTS links;
+                    DROP TABLE IF EXISTS observations; DROP TABLE IF EXISTS obs_fts;
+                    DROP TABLE IF EXISTS notes_fts; DROP TABLE IF EXISTS meta;`);
+    }
+
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS notes (
         id TEXT PRIMARY KEY,
@@ -249,6 +265,9 @@ export class MemoryStore {
         doc_id UNINDEXED, ord UNINDEXED, text, tokenize = 'trigram'
       );
     `);
+
+    if (needsUpgrade) this.rebuild();
+    if (version !== SCHEMA_VERSION) this.#setMeta('schema_version', SCHEMA_VERSION);
   }
 
   close() { this.db.close(); }
@@ -508,6 +527,7 @@ export class MemoryStore {
     const heads = rows.filter((r) => !referenced.has(r.hash));
     if (heads.length === 1) this.#setMeta('chain_head', heads[0].hash);
     this.#setMeta('chain_len', rows.length);
+    this.#setMeta('schema_version', SCHEMA_VERSION);
     return count;
   }
 
