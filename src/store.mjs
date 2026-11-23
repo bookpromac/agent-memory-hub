@@ -302,9 +302,10 @@ export class MemoryStore {
       const obs = observationsOf(body);
       const ins = this.db.prepare('INSERT INTO observations (doc_id, ord, text) VALUES (?,?,?)');
       const insFts = this.db.prepare('INSERT INTO obs_fts (doc_id, ord, text) VALUES (?,?,?)');
-      for (const o of obs) {
+      // ord = -1 是标题行：让「只出现在标题里的词」也能被全文检索命中
+      const titleRow = { ord: -1, text: meta.title };
+      for (const o of [titleRow, ...obs]) {
         ins.run(id, o.ord, o.text);
-        // 锚词并入该文档首条观察的检索文本，提升同义召回
         const extra = o.ord === 0 && (meta.anchors || []).length ? ` ${meta.anchors.join(' ')}` : '';
         insFts.run(id, o.ord, o.text + extra);
       }

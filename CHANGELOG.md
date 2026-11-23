@@ -9,6 +9,8 @@
 - **修订语义改为追加**：旧条目标记 `superseded` + `valid_to`，新条目写入链尾（不再原地覆盖）
 - `memhub migrate`：v1 → v2 升级，自动备份到 `backups/pre-v2-*`
 - MCP 新 resource `memory://audit`
+- 标题行（`ord = -1`）进入索引，只出现在标题里的词也能被全文检索命中
+- 旧 SQLite 库用 `schema_version` 标记检测并重建索引
 
 ### 变更
 - 2 字中文查询回退到观察表 LIKE（trigram 最少 3 字）

@@ -18,13 +18,22 @@
 - [x] 适配文件模板：AGENTS.md / .cursor/rules
 - [ ] 会话开场自动注入最近 5 条（DSH prompt context 插件）
 
-## v0.3 — 迁移（P3）
+## v0.3 — 审计与 Schema v2（已完成）
 
-- [ ] `memhub import`：从 JSONL 会话抽取候选记忆
+- [x] Schema v2：`valid_from` / `valid_to` / `anchors` / `prev_hash` / `hash`
+- [x] 哈希审计链 + `memhub verify`
+- [x] 观察级检索（`## 观察` 每条独立索引）
+- [x] 修订改为「旧条目 superseded + 新条目追加」
+- [x] `memhub migrate`（v1 → v2，自动备份）
+- [x] 旧 SQLite 库版本升级路径
+
+## v0.4 — 历史迁移（P3）
+
+- [ ] `memhub import`：从 JSONL 会话抽取候选记忆（含 anchors/valid_from 推断）
 - [ ] 子代理批量蒸馏 imported-agents（48,725 条 → 目标 100–300 条）
 - [ ] 人工审核工作流（staging → accept/reject）
 
-## v0.4 — 运维（P4）
+## v0.5 — 运维（P4）
 
 - [ ] launchd 每日 `git commit`
 - [ ] `memhub stats --agent` 写入分布
