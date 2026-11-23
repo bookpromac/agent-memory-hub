@@ -28,7 +28,8 @@
   "scripts": {
     "test": "node test/smoke.mjs && node test/http.test.mjs && node test/dsh.test.mjs && node test/multiagent.test.mjs",
     "mcp": "node src/mcp.mjs",
-    "doctor": "node src/cli.mjs doctor"
+    "doctor": "node src/cli.mjs doctor",
+    "pm": "node scripts/pm.mjs"
   },
   "engines": {
     "node": ">=22.5"
