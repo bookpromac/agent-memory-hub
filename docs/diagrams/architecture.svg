@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="980" viewBox="0 0 1500 980" font-family="PingFang SC, Helvetica Neue, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8a94a6"/>
+    </marker>
+    <style>
+      .band-label { font-size: 13px; fill: #8a94a6; letter-spacing: 1px; }
+      .box-title { font-size: 15px; font-weight: 600; }
+      .box-sub { font-size: 12px; fill: #5b6472; }
+      .flow { font-size: 12px; fill: #5b6472; }
+      .card { stroke-width: 1.5; rx: 10; }
+      .tool { font-size: 13px; font-weight: 600; fill: #1f4d3a; }
+    </style>
+  </defs>
+
+  <rect width="1500" height="980" fill="#f7f8fa"/>
+
+  <text x="40" y="52" font-size="26" font-weight="700" fill="#1c2430">Agent Memory Hub · 设计方案 v0.4</text>
+  <text x="40" y="80" font-size="14" fill="#6b7480">一个记忆服务，多种接口 —— 存储只做一次，每个智能体只写一个适配器</text>
+
+  <!-- ① 智能体层 -->
+  <text x="40" y="152" class="band-label">① 智能体</text>
+  <g>
+    <rect class="card" x="180" y="108" width="196" height="76" rx="10" fill="#e8f0fe" stroke="#4a72c4"/>
+    <text x="200" y="138" class="box-title" fill="#1f3a68">DeepSeek Harness</text>
+    <text x="200" y="160" class="box-sub">MCP · 已安装</text>
+
+    <rect class="card" x="390" y="108" width="196" height="76" rx="10" fill="#e8f0fe" stroke="#4a72c4"/>
+    <text x="410" y="138" class="box-title" fill="#1f3a68">Claude Code</text>
+    <text x="410" y="160" class="box-sub">MCP · 已安装</text>
+
+    <rect class="card" x="600" y="108" width="196" height="76" rx="10" fill="#e8f0fe" stroke="#4a72c4"/>
+    <text x="620" y="138" class="box-title" fill="#1f3a68">Codex CLI</text>
+    <text x="620" y="160" class="box-sub">MCP · 已安装</text>
+
+    <rect class="card" x="810" y="108" width="196" height="76" rx="10" fill="#f2f4f7" stroke="#a9b2bf" stroke-dasharray="5 4"/>
+    <text x="830" y="138" class="box-title" fill="#6b7480">Cursor</text>
+    <text x="830" y="160" class="box-sub">MCP · 未安装</text>
+
+    <rect class="card" x="1020" y="108" width="196" height="76" rx="10" fill="#e8f0fe" stroke="#4a72c4"/>
+    <text x="1040" y="138" class="box-title" fill="#1f3a68">脚本 / cron</text>
+    <text x="1040" y="160" class="box-sub">HTTP · CLI</text>
+
+    <rect class="card" x="1230" y="108" width="196" height="76" rx="10" fill="#fdf3e7" stroke="#d9a15b" stroke-dasharray="5 4"/>
+    <text x="1250" y="138" class="box-title" fill="#7a4a12">只能导出的产品</text>
+    <text x="1250" y="160" class="box-sub">豆包 / 阶跃 / 扣子</text>
+  </g>
+
+  <!-- flow 1: adapters -->
+  <line x1="760" y1="184" x2="760" y2="246" stroke="#8a94a6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="776" y="212" class="flow">适配器：检测 → 生成配置片段 → 协议翻译（7 个）</text>
+
+  <!-- ② 接口层 -->
+  <text x="40" y="302" class="band-label">② 接口</text>
+  <g>
+    <rect class="card" x="180" y="252" width="296" height="96" rx="10" fill="#fff4e6" stroke="#d9822b"/>
+    <text x="200" y="280" class="box-title" fill="#7a4110">MCP stdio</text>
+    <text x="200" y="302" class="box-sub">长连接 · JSON-RPC</text>
+    <text x="200" y="322" class="box-sub">6 工具 + 3 resources · 本机进程</text>
+
+    <rect class="card" x="492" y="252" width="296" height="96" rx="10" fill="#fff4e6" stroke="#d9822b"/>
+    <text x="512" y="280" class="box-title" fill="#7a4110">HTTP 守护进程</text>
+    <text x="512" y="302" class="box-sub">仅 127.0.0.1 · Bearer token</text>
+    <text x="512" y="322" class="box-sub">/v1/search · /v1/write · /v1/audit</text>
+
+    <rect class="card" x="804" y="252" width="296" height="96" rx="10" fill="#fff4e6" stroke="#d9822b"/>
+    <text x="824" y="280" class="box-title" fill="#7a4110">CLI</text>
+    <text x="824" y="302" class="box-sub">shell · cron · 一次性任务</text>
+    <text x="824" y="322" class="box-sub">12 个命令 · 无鉴权（本机文件权限）</text>
+
+    <rect class="card" x="1116" y="252" width="296" height="96" rx="10" fill="#fff4e6" stroke="#d9822b"/>
+    <text x="1136" y="280" class="box-title" fill="#7a4110">文件导入</text>
+    <text x="1136" y="302" class="box-sub">JSONL · Markdown</text>
+    <text x="1136" y="322" class="box-sub">memhub import → 粗导入再蒸馏</text>
+  </g>
+
+  <!-- flow 2 -->
+  <line x1="760" y1="348" x2="760" y2="402" stroke="#8a94a6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="776" y="376" class="flow">同一套工具名、参数与语义</text>
+
+  <!-- ③ 契约层 -->
+  <text x="40" y="450" class="band-label">③ 契约</text>
+  <rect class="card" x="180" y="408" width="1232" height="88" rx="10" fill="#e9f7ef" stroke="#2f9e63"/>
+  <text x="200" y="436" class="box-title" fill="#1f4d3a">tools.mjs — 唯一工具契约（MCP 与 HTTP 共用，避免两套实现漂移）</text>
+  <text x="200" y="466" class="tool">mem_search</text>
+  <text x="300" y="466" class="box-sub">·</text>
+  <text x="318" y="466" class="tool">mem_get</text>
+  <text x="398" y="466" class="box-sub">·</text>
+  <text x="416" y="466" class="tool">mem_write</text>
+  <text x="512" y="466" class="box-sub">·</text>
+  <text x="530" y="466" class="tool">mem_revise</text>
+  <text x="630" y="466" class="box-sub">·</text>
+  <text x="648" y="466" class="tool">mem_recent</text>
+  <text x="748" y="466" class="box-sub">·</text>
+  <text x="766" y="466" class="tool">mem_forget</text>
+  <text x="880" y="466" class="box-sub">← 参数校验、密钥拦截、出处强制，都只在这里定义一次</text>
+
+  <!-- flow 3 -->
+  <line x1="760" y1="496" x2="760" y2="550" stroke="#8a94a6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="776" y="524" class="flow">callTool(store, name, args)</text>
+
+  <!-- ④ 核心 -->
+  <text x="40" y="600" class="band-label">④ 核心</text>
+  <rect class="card" x="180" y="556" width="1232" height="206" rx="10" fill="#f3e8ff" stroke="#7b4bb7"/>
+  <text x="200" y="584" class="box-title" fill="#44267a">store.mjs — 唯一认识数据的地方（689 行 ≈ 43% 复杂度；不 import 任何上层）</text>
+
+  <rect x="200" y="602" width="380" height="140" rx="8" fill="#ffffff" stroke="#c9b3e6"/>
+  <text x="216" y="626" font-size="13" font-weight="600" fill="#44267a">写入管线</text>
+  <text x="216" y="650" class="box-sub">kind / 出处 / 置信度校验</text>
+  <text x="216" y="670" class="box-sub">正文哈希去重</text>
+  <text x="216" y="690" class="box-sub">密钥正则拦截</text>
+  <text x="216" y="710" class="box-sub">prev_hash → hash 链接</text>
+  <text x="216" y="730" class="box-sub">tmp + rename 原子落盘</text>
+
+  <rect x="600" y="602" width="380" height="140" rx="8" fill="#ffffff" stroke="#c9b3e6"/>
+  <text x="616" y="626" font-size="13" font-weight="600" fill="#44267a">索引（派生，可重建）</text>
+  <text x="616" y="650" class="box-sub">FTS5 trigram — 中文分词前提</text>
+  <text x="616" y="670" class="box-sub">标题行 ord=-1 · 观察 ord≥0</text>
+  <text x="616" y="690" class="box-sub">2 字词回退观察表 LIKE</text>
+  <text x="616" y="710" class="box-sub">bm25 排序 · 命中具体观察</text>
+  <text x="616" y="730" class="box-sub">删 index.sqlite 不影响记忆</text>
+
+  <rect x="1000" y="602" width="392" height="140" rx="8" fill="#ffffff" stroke="#c9b3e6"/>
+  <text x="1016" y="626" font-size="13" font-weight="600" fill="#44267a">审计与维护</text>
+  <text x="1016" y="650" class="box-sub">verify — 逐条复算哈希链</text>
+  <text x="1016" y="670" class="box-sub">migrate — v1→v2，先备份</text>
+  <text x="1016" y="690" class="box-sub">gc — 墓碑与旧修订（默认 dry-run）</text>
+  <text x="1016" y="710" class="box-sub">doctor — 断链 / 重复 / 索引漂移</text>
+  <text x="1016" y="730" class="box-sub">rebuild — 从 Markdown 全量重建</text>
+
+  <!-- flow 4 -->
+  <line x1="760" y1="762" x2="760" y2="816" stroke="#8a94a6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="776" y="790" class="flow">Markdown 是事实源；SQLite 只是索引</text>
+
+  <!-- ⑤ 存储 -->
+  <text x="40" y="872" class="band-label">⑤ 存储</text>
+  <g>
+    <rect class="card" x="180" y="822" width="296" height="96" rx="10" fill="#eef2f5" stroke="#4a5568"/>
+    <text x="200" y="850" class="box-title" fill="#2d3748">memories/*.md</text>
+    <text x="200" y="872" class="box-sub">事实源 · frontmatter + 观察</text>
+    <text x="200" y="892" class="box-sub">git 可版本化 · 人可直接改</text>
+
+    <rect class="card" x="492" y="822" width="296" height="96" rx="10" fill="#f2f4f7" stroke="#a9b2bf" stroke-dasharray="5 4"/>
+    <text x="512" y="850" class="box-title" fill="#6b7480">index.sqlite</text>
+    <text x="512" y="872" class="box-sub">派生索引 · 可删可重建</text>
+    <text x="512" y="892" class="box-sub">FTS5 + observations + links</text>
+
+    <rect class="card" x="804" y="822" width="296" height="96" rx="10" fill="#eef2f5" stroke="#4a5568"/>
+    <text x="824" y="850" class="box-title" fill="#2d3748">revisions/</text>
+    <text x="824" y="872" class="box-sub">每次修订的旧版快照</text>
+    <text x="824" y="892" class="box-sub">按 id + 时间戳归档</text>
+
+    <rect class="card" x="1116" y="822" width="296" height="96" rx="10" fill="#eef2f5" stroke="#4a5568"/>
+    <text x="1136" y="850" class="box-title" fill="#2d3748">backups/</text>
+    <text x="1136" y="872" class="box-sub">迁移 / 清理前快照</text>
+    <text x="1136" y="892" class="box-sub">pre-v2-* · 可回滚</text>
+  </g>
+
+  <!-- 约束条 -->
+  <text x="40" y="956" font-size="12" fill="#8a94a6">六条硬约束：可读 · 可脱离程序 · 中文可用 · 可审计 · 本地（不开局域网端口） · 零运行时依赖</text>
+
+  <!-- 图例 -->
+  <rect x="1080" y="56" width="14" height="14" rx="3" fill="#e8f0fe" stroke="#4a72c4"/>
+  <text x="1100" y="68" font-size="11" fill="#6b7480">智能体</text>
+  <rect x="1150" y="56" width="14" height="14" rx="3" fill="#fff4e6" stroke="#d9822b"/>
+  <text x="1170" y="68" font-size="11" fill="#6b7480">接口</text>
+  <rect x="1206" y="56" width="14" height="14" rx="3" fill="#e9f7ef" stroke="#2f9e63"/>
+  <text x="1226" y="68" font-size="11" fill="#6b7480">契约</text>
+  <rect x="1270" y="56" width="14" height="14" rx="3" fill="#f3e8ff" stroke="#7b4bb7"/>
+  <text x="1290" y="68" font-size="11" fill="#6b7480">核心</text>
+  <rect x="1334" y="56" width="14" height="14" rx="3" fill="#eef2f5" stroke="#4a5568"/>
+  <text x="1354" y="68" font-size="11" fill="#6b7480">存储</text>
+</svg>

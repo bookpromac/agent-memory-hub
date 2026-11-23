@@ -35,6 +35,14 @@
 
 本项目的取舍：**可读、可改、可版本化、可重建**，牺牲的是自动提取与语义检索。
 
+## 设计图
+
+| 架构总览 | 数据模型与审计链 |
+|---|---|
+| ![架构](docs/diagrams/architecture.png) | ![数据模型](docs/diagrams/data-model.png) |
+
+矢量源文件：[architecture.svg](docs/diagrams/architecture.svg) · [data-model.svg](docs/diagrams/data-model.svg)
+
 ## 架构：一个记忆服务，多种接口
 
 ```

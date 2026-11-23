@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="900" viewBox="0 0 1500 900" font-family="PingFang SC, Helvetica Neue, Arial, sans-serif">
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8a94a6"/>
+    </marker>
+    <style>
+      .mono { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+      .label { font-size: 13px; font-weight: 600; }
+      .sub { font-size: 12px; fill: #5b6472; }
+      .note { font-size: 11px; fill: #8a94a6; }
+    </style>
+  </defs>
+
+  <rect width="1500" height="900" fill="#f7f8fa"/>
+
+  <text x="40" y="52" font-size="26" font-weight="700" fill="#1c2430">数据模型与审计链</text>
+  <text x="40" y="80" font-size="14" fill="#6b7480">一条记忆 = 一个 Markdown 文件；索引可重建；链只追加，因此可回答「当时记了什么、何时被谁取代」</text>
+
+  <!-- 左：文件 -->
+  <rect x="40" y="108" width="660" height="700" rx="12" fill="#ffffff" stroke="#d7dce3"/>
+  <text x="60" y="136" class="label" fill="#2d3748">~/Memory/memories/decisions/2026-11/…md</text>
+
+  <g class="mono" fill="#2d3748">
+    <text x="60" y="166">---</text>
+    <text x="60" y="188">id: 01M83ZC22Q09A1V0S9N4PX3DH0</text>
+    <text x="60" y="210">kind: decisions</text>
+    <text x="60" y="232">title: 只保留一个智能体</text>
+    <text x="60" y="254">created: 2026-11-23T10:31Z</text>
+    <text x="60" y="276">updated: 2026-11-23T10:31Z</text>
+    <text x="60" y="298">valid_from: 2026-11-23</text>
+    <text x="60" y="320">valid_to: 2026-11-25</text>
+    <text x="60" y="342">tags: [agent, cleanup]</text>
+    <text x="60" y="364">anchors: [智能体, agent, 收敛]</text>
+    <text x="60" y="386">confidence: high</text>
+    <text x="60" y="408">source:</text>
+    <text x="60" y="430">  agent: deepseek-harness</text>
+    <text x="60" y="452">  session: 440a6d9b</text>
+    <text x="60" y="474">prev_hash: 372cd2…</text>
+    <text x="60" y="496">hash: 9f2c41…</text>
+    <text x="60" y="518">schema: 2</text>
+    <text x="60" y="540">---</text>
+    <text x="60" y="562">## 结论</text>
+    <text x="60" y="584">本机只保留 DSH 一个 agent。</text>
+    <text x="60" y="606">## 观察</text>
+    <text x="60" y="628">- [scope=本机] 其余已删除</text>
+    <text x="60" y="650">- [scope=回滚] 仅存导出副本</text>
+  </g>
+
+  <g font-size="11" fill="#8a94a6">
+    <text x="420" y="298">← 双时态：事实何时为真</text>
+    <text x="420" y="320">← 何时失效（修订/弃用）</text>
+    <text x="420" y="364">← 锚词：补中文同义召回</text>
+    <text x="420" y="430">← 出处必填，否则拒写</text>
+    <text x="420" y="474">← 上一条的 hash</text>
+    <text x="420" y="496">← 本条 hash，链由此成立</text>
+    <text x="420" y="606">← 每条观察单独建索引</text>
+  </g>
+
+  <line x1="400" y1="292" x2="412" y2="294" stroke="#c9cfd8"/>
+  <line x1="400" y1="358" x2="412" y2="360" stroke="#c9cfd8"/>
+  <line x1="400" y1="424" x2="412" y2="426" stroke="#c9cfd8"/>
+  <line x1="400" y1="600" x2="412" y2="602" stroke="#c9cfd8"/>
+
+  <text x="60" y="692" class="note">文件本身可被 git 版本化、被编辑器直接修改；删除索引不影响它</text>
+
+  <!-- 右：链 -->
+  <text x="760" y="136" class="label" fill="#2d3748">审计链：写入即链接</text>
+
+  <rect x="760" y="152" width="190" height="86" rx="8" fill="#e9f7ef" stroke="#2f9e63"/>
+  <text x="778" y="178" font-size="13" font-weight="600" fill="#1f4d3a">第 1 条</text>
+  <text x="778" y="198" font-size="11" fill="#4a5568">hash A</text>
+  <text x="778" y="218" font-size="11" fill="#8a94a6">prev ∅</text>
+
+  <line x1="950" y1="195" x2="1000" y2="195" stroke="#8a94a6" stroke-width="1.5" marker-end="url(#a2)"/>
+  <text x="953" y="188" font-size="10" fill="#8a94a6">prev=A</text>
+
+  <rect x="1000" y="152" width="190" height="86" rx="8" fill="#e9f7ef" stroke="#2f9e63"/>
+  <text x="1018" y="178" font-size="13" font-weight="600" fill="#1f4d3a">第 2 条</text>
+  <text x="1018" y="198" font-size="11" fill="#4a5568">hash B</text>
+  <text x="1018" y="218" font-size="11" fill="#4a5568">prev A</text>
+
+  <line x1="1190" y1="195" x2="1240" y2="195" stroke="#8a94a6" stroke-width="1.5" marker-end="url(#a2)"/>
+  <text x="1193" y="188" font-size="10" fill="#8a94a6">prev=B</text>
+
+  <rect x="1240" y="152" width="190" height="86" rx="8" fill="#e9f7ef" stroke="#2f9e63"/>
+  <text x="1258" y="178" font-size="13" font-weight="600" fill="#1f4d3a">第 3 条</text>
+  <text x="1258" y="198" font-size="11" fill="#4a5568">hash C</text>
+  <text x="1258" y="218" font-size="11" fill="#4a5568">prev B</text>
+
+  <!-- 公式 -->
+  <rect x="760" y="268" width="670" height="66" rx="8" fill="#f3e8ff" stroke="#7b4bb7"/>
+  <text x="778" y="292" font-size="12" fill="#6b7480">哈希公式（可由文件字段完整复算，不依赖数据库）</text>
+  <text x="778" y="316" font-family="SF Mono, Menlo, monospace" font-size="12.5" fill="#44267a">hash = sha256( prev_hash ‖ id ‖ created ‖ agent ‖ body )</text>
+
+  <!-- 篡改检测 -->
+  <rect x="760" y="352" width="670" height="74" rx="8" fill="#fdecec" stroke="#d9534f"/>
+  <text x="778" y="376" font-size="13" font-weight="600" fill="#8a2b28">verify：任何改写都会被检出</text>
+  <text x="778" y="398" font-size="12" fill="#8a4a48">改动正文一个字 → 复算 hash 与原值不符 → hash-mismatch</text>
+  <text x="778" y="416" font-size="12" fill="#8a4a48">重建索引、迁移、正常读取都不改变链；只有手改文件才会断</text>
+
+  <!-- 修订语义 -->
+  <text x="760" y="470" class="label" fill="#2d3748">修订 ≠ 覆盖：旧条目标记 superseded，新条目追加到链尾</text>
+
+  <rect x="760" y="484" width="300" height="150" rx="8" fill="#f2f4f7" stroke="#a9b2bf"/>
+  <text x="778" y="510" font-size="13" font-weight="600" fill="#4a5568">旧条目（内容不动）</text>
+  <text x="778" y="534" font-size="11" fill="#5b6472">status: superseded</text>
+  <text x="778" y="554" font-size="11" fill="#5b6472">valid_to: 2026-11-25</text>
+  <text x="778" y="574" font-size="11" fill="#5b6472">hash 保持 A 不变</text>
+  <text x="778" y="598" font-size="11" fill="#8a94a6">仍可检索到历史，但不再出现在默认结果</text>
+
+  <line x1="1060" y1="558" x2="1110" y2="558" stroke="#8a94a6" stroke-width="1.5" marker-end="url(#a2)"/>
+  <text x="1062" y="550" font-size="10" fill="#8a94a6">supersedes</text>
+
+  <rect x="1110" y="484" width="320" height="150" rx="8" fill="#e8f0fe" stroke="#4a72c4"/>
+  <text x="1128" y="510" font-size="13" font-weight="600" fill="#1f3a68">新条目（写入链尾）</text>
+  <text x="1128" y="534" font-size="11" fill="#3a5a8c">supersedes: 旧 id</text>
+  <text x="1128" y="554" font-size="11" fill="#3a5a8c">prev_hash = 旧条目之前的链头</text>
+  <text x="1128" y="574" font-size="11" fill="#3a5a8c">valid_from = 今天</text>
+  <text x="1128" y="598" font-size="11" fill="#8a94a6">链只追加，所以“何时被取代”可回答</text>
+
+  <!-- 索引结构 -->
+  <text x="760" y="676" class="label" fill="#2d3748">索引（全部可从 Markdown 重建）</text>
+
+  <rect x="760" y="692" width="210" height="76" rx="8" fill="#eef2f5" stroke="#4a5568"/>
+  <text x="776" y="716" font-size="12" font-weight="600" fill="#2d3748">observations</text>
+  <text x="776" y="736" font-size="10.5" fill="#5b6472">doc_id · ord · text</text>
+  <text x="776" y="754" font-size="10.5" fill="#5b6472">ord=-1 标题 · ≥0 观察</text>
+
+  <rect x="990" y="692" width="210" height="76" rx="8" fill="#eef2f5" stroke="#4a5568"/>
+  <text x="1006" y="716" font-size="12" font-weight="600" fill="#2d3748">obs_fts (FTS5)</text>
+  <text x="1006" y="736" font-size="10.5" fill="#5b6472">tokenize = trigram</text>
+  <text x="1006" y="754" font-size="10.5" fill="#5b6472">中文检索前提</text>
+
+  <rect x="1220" y="692" width="210" height="76" rx="8" fill="#eef2f5" stroke="#4a5568"/>
+  <text x="1236" y="716" font-size="12" font-weight="600" fill="#2d3748">notes</text>
+  <text x="1236" y="736" font-size="10.5" fill="#5b6472">id · kind · status</text>
+  <text x="1236" y="754" font-size="10.5" fill="#5b6472">prev_hash · hash</text>
+
+  <text x="40" y="856" font-size="12" fill="#8a94a6">不变量：Markdown 是唯一事实源 · 写入必须带出处 · 删除只打墓碑 · 修订必留旧版 · 密钥不入库 · 链只追加</text>
+</svg>
