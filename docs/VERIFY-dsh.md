@@ -70,3 +70,53 @@ memhub search "agent" --limit 3
 cp ~/.dsh/profiles/desktop/cordis.patch.yml.bak-20261123-055743 \
    ~/.dsh/profiles/desktop/cordis.patch.yml
 ```
+
+---
+
+# Claude Code 接入（部分完成 ⚠️）
+
+## 已完成
+
+```bash
+claude mcp add memory --scope user \
+  -e MEMORY_HOME=/Users/macbookpro/Memory \
+  -- node <repo>/src/mcp.mjs
+```
+
+结果：
+
+```
+$ claude mcp list
+memory: node .../src/mcp.mjs - ✔ Connected
+```
+
+`✔ Connected` 是 Claude Code **自己**启动 server 并完成 MCP 握手后给出的结论，所以"服务可用"已确定。
+
+记忆指令写在 `CLAUDE.md`（工作区根），Claude Code 会自动加载。
+
+## 未完成：agent 级调用
+
+headless 测试：
+
+```bash
+claude -p 'Use mcp__memory__mem_search ...' --allowedTools mcp__memory__mem_search
+# → 401 Incorrect API key provided
+```
+
+**卡点不是 MCP，是 Claude Code 的模型鉴权。** 需要你在 Claude Code 里登录（或配置 `ANTHROPIC_API_KEY`）后才能跑通。
+
+## 登录后的验证
+
+```bash
+cd ~/Documents/deepseek-harness/default-workspace
+claude -p 'Call mcp__memory__mem_search with query "接入 DeepSeek" and print the JSON.' \
+  --allowedTools mcp__memory__mem_search
+```
+
+期望：返回 DSH 写的那条记忆 → **跨智能体记忆成立**。
+
+## 移除
+
+```bash
+claude mcp remove memory -s user
+```

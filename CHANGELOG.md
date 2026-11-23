@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6.1 — 2026-11-23
+
+### 接入
+- Claude Code 注册同一 MCP 服务（user scope），`claude mcp list` → ✔ Connected
+- 工作区新增 `CLAUDE.md` 记忆约定
+- 说明：agent 级调用待 Claude Code 鉴权（401），MCP 层已验证
+
 ## v0.6.0 — 2026-11-23
 
 ### 里程碑
