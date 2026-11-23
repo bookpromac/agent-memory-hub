@@ -88,6 +88,19 @@ try {
       print({ indexed: store.rebuild() });
       break;
     }
+    case 'doctor': {
+      const res = store.doctor();
+      print(res);
+      if (!res.ok) process.exitCode = 1;
+      break;
+    }
+    case 'gc': {
+      print(store.gc({
+        olderThanDays: Number(args['older-than'] || 30),
+        dryRun: !(args.yes || args.apply),
+      }));
+      break;
+    }
     case 'stats': {
       print(store.stats());
       break;
@@ -106,6 +119,8 @@ try {
         + '  memhub recent [--limit 10]\n'
         + '  memhub revise <id> --body-file - --reason "为何改"\n'
         + '  memhub forget <id> --reason "为何弃用"\n'
+        + '  memhub doctor                 # 体检：frontmatter/重复/断链/索引漂移\n'
+        + '  memhub gc [--older-than 30] [--yes]   # 清理墓碑与旧修订（默认 dry-run）\n'
         + '  memhub rebuild | stats | path\n',
       );
       process.exitCode = 1;

@@ -1,0 +1,13 @@
+# 放进 ~/.dsh/profiles/desktop/cordis.patch.yml（追加为列表项）
+# 路径需改成你本机仓库的绝对路径
+- id: memory-hub
+  name: "@deepseek-ai/dsh-mcp-client"
+  config:
+    serverName: memory
+    transport: stdio
+    command: node
+    args:
+      - /absolute/path/to/agent-memory-hub/src/mcp.mjs
+    env:
+      MEMORY_HOME: /Users/you/Memory
+    failOnStartupError: true

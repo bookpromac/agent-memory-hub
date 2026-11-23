@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "memory": {
+      "command": "node",
+      "args": ["/absolute/path/to/agent-memory-hub/src/mcp.mjs"],
+      "env": {
+        "MEMORY_HOME": "/Users/you/Memory"
+      }
+    }
+  }
+}

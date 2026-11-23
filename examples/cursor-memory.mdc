@@ -1,0 +1,10 @@
+---
+description: 长期记忆访问约定
+alwaysApply: true
+---
+
+任务开始前调用 `mem_search("<任务关键词>")` 检索长期记忆；命中则先读再动手。
+
+任务结束前，把可复用的结论写入 `mem_write`（`source_agent` 必填）。
+
+不要写入密码、token 或密钥。

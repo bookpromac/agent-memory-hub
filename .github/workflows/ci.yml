@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22", "24", "26"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Smoke tests
+        run: node test/smoke.mjs
+
+      - name: CLI help
+        run: node src/cli.mjs || true
+
+  doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+      - name: Doctor on a fresh store
+        run: |
+          export MEMORY_HOME="$RUNNER_TEMP/Memory"
+          node src/cli.mjs init
+          node src/cli.mjs doctor
+          node src/cli.mjs gc

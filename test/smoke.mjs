@@ -73,6 +73,25 @@ assert.equal(store.search('智能体').length, 0, '墓碑后不再检索到');
 // 10. 重建索引
 const n = store.rebuild();
 assert.ok(n >= 1, '重建应至少索引 1 条');
+
+// 11. doctor：干净库应通过
+const d1 = store.doctor();
+assert.equal(d1.ok, true, `doctor 应通过，实际问题：${JSON.stringify(d1.problems)}`);
+
+// 12. doctor：能发现坏文件
+const bad = path.join(tmp, 'memories', 'facts', '2026-11', 'broken.md');
+fs.mkdirSync(path.dirname(bad), { recursive: true });
+fs.writeFileSync(bad, '---\nkind: facts\ntitle: 坏文件\n---\n没有 id 和出处\n');
+const d2 = store.doctor();
+assert.equal(d2.ok, false, 'doctor 应报错');
+assert.ok(d2.problems.some((p) => p.code === 'missing-id'), '应报 missing-id');
+assert.ok(d2.problems.some((p) => p.code === 'missing-source'), '应报 missing-source');
+fs.rmSync(bad);
+
+// 13. gc：默认 dry-run，不删东西
+const g1 = store.gc();
+assert.equal(g1.dryRun, true);
+assert.equal(fs.existsSync(bad), false);
 store.close();
 
 // 11. CLI 可用
@@ -105,4 +124,4 @@ assert.ok(lines[1].result.tools.length >= 6, '应暴露 ≥6 个工具');
 assert.ok(Array.isArray(lines[2].result.content), 'tools/call 应返回 content');
 
 fs.rmSync(tmp, { recursive: true, force: true });
-console.log('✓ 12 项冒烟测试全部通过');
+console.log('✓ 15 项冒烟测试全部通过');

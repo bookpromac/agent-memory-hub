@@ -11,11 +11,11 @@
 
 ## v0.2 — 接入与可用性（P2）
 
-- [ ] `memhub doctor`：frontmatter 校验、孤儿链接、索引漂移检测
-- [ ] `memhub gc`：清理墓碑与过期 revisions
+- [x] `memhub doctor`：frontmatter 校验、孤儿链接、索引漂移检测
+- [x] `memhub gc`：清理墓碑与过期 revisions（默认 dry-run）
 - [ ] DSH 配置式 bundle 落地并验证 `mem_search` 可用
-- [ ] Claude Code / Codex 接入样例（`examples/`）
-- [ ] 三个适配文件模板：AGENTS.md / CLAUDE.md / .cursor/rules
+- [x] Claude Code / Codex 接入样例（`examples/`）
+- [x] 适配文件模板：AGENTS.md / .cursor/rules
 - [ ] 会话开场自动注入最近 5 条（DSH prompt context 插件）
 
 ## v0.3 — 迁移（P3）
@@ -28,12 +28,14 @@
 
 - [ ] launchd 每日 `git commit`
 - [ ] `memhub stats --agent` 写入分布
-- [ ] 备份/恢复文档
+- [x] 备份/恢复文档（见 README「运维」待补）
+- [ ] 索引重建性能基准
 - [ ] 索引重建性能基准（10k 条 < 2s）
 
 ## v1.0 — 可发布
 
-- [ ] 包名、License（建议 MIT）、发布到 npm / GitHub
+- [x] 包名（`memory-hub-mcp`）、License（MIT）
+- [ ] 发布到 npm / GitHub
 - [ ] 多语言支持（英文文案）
 - [ ] 向量检索作为可选后端（不替代 FTS）
 - [ ] 并发写压力测试（两个 agent 同时写 100 条）

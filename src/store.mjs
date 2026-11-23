@@ -383,4 +383,90 @@ export class MemoryStore {
     const byConf = this.db.prepare('SELECT confidence, COUNT(*) c FROM notes WHERE tombstoned = 0 GROUP BY confidence').all();
     return { total, tombstoned: tomb, byKind, byAgent, byConfidence: byConf, home: this.home };
   }
+
+  /** 体检：frontmatter 合法性、重复、断链、索引漂移。只读。 */
+  doctor() {
+    const problems = [];
+    const files = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, entry.name);
+        if (entry.isDirectory()) { walk(p); continue; }
+        if (entry.name.endsWith('.md')) files.push(p);
+      }
+    };
+    walk(this.memDir);
+
+    const seenHash = new Map();
+    const ids = new Set();
+    for (const file of files) {
+      const raw = fs.readFileSync(file, 'utf8');
+      const { meta, body } = parseFrontmatter(raw);
+      const rel = path.relative(this.home, file);
+      if (!meta.id) problems.push({ level: 'error', code: 'missing-id', file: rel });
+      if (!KINDS.includes(meta.kind)) problems.push({ level: 'error', code: 'bad-kind', file: rel, value: meta.kind });
+      if (!meta.title) problems.push({ level: 'error', code: 'missing-title', file: rel });
+      if (!CONFIDENCE.includes(meta.confidence)) problems.push({ level: 'warn', code: 'bad-confidence', file: rel, value: meta.confidence });
+      if (!meta.source?.agent) problems.push({ level: 'error', code: 'missing-source', file: rel });
+      if (meta.id) ids.add(meta.id);
+      const h = sha256(String(body).replace(/\s+/g, ' ').trim());
+      if (seenHash.has(h)) problems.push({ level: 'warn', code: 'duplicate', file: rel, other: seenHash.get(h) });
+      else seenHash.set(h, rel);
+    }
+
+    for (const file of files) {
+      const { meta } = parseFrontmatter(fs.readFileSync(file, 'utf8'));
+      for (const lk of meta.links || []) {
+        if (!ids.has(lk.target)) {
+          problems.push({ level: 'warn', code: 'broken-link', file: path.relative(this.home, file), target: lk.target });
+        }
+      }
+    }
+
+    const rows = this.db.prepare('SELECT id, path, content_hash FROM notes').all();
+    const indexed = new Set(rows.map((r) => r.path));
+    for (const file of files) {
+      if (!indexed.has(file)) problems.push({ level: 'error', code: 'not-indexed', file: path.relative(this.home, file) });
+    }
+    for (const r of rows) {
+      if (!fs.existsSync(r.path)) problems.push({ level: 'error', code: 'missing-file', file: r.path });
+    }
+
+    const errors = problems.filter((p) => p.level === 'error').length;
+    return { ok: errors === 0, files: files.length, indexed: rows.length, problems };
+  }
+
+  /** 清理：墓碑与旧修订。默认 dry-run，需显式 dryRun:false 才删除。 */
+  gc({ olderThanDays = 30, dryRun = true } = {}) {
+    const cutoff = new Date(Date.now() - olderThanDays * 86400000).toISOString();
+    const tombs = this.db.prepare('SELECT id, path FROM notes WHERE tombstoned = 1 AND updated < ?').all(cutoff);
+    const revDir = path.join(this.home, 'revisions');
+    const revs = [];
+    if (fs.existsSync(revDir)) {
+      for (const id of fs.readdirSync(revDir)) {
+        const d = path.join(revDir, id);
+        if (!fs.statSync(d).isDirectory()) continue;
+        for (const f of fs.readdirSync(d)) {
+          const p = path.join(d, f);
+          if (fs.statSync(p).mtime.toISOString() < cutoff) revs.push(p);
+        }
+      }
+    }
+
+    let freed = 0;
+    if (!dryRun) {
+      for (const t of tombs) {
+        try { freed += fs.statSync(t.path).size; fs.rmSync(t.path); } catch { /* 已不存在 */ }
+        this.db.prepare('DELETE FROM notes WHERE id = ?').run(t.id);
+      }
+      for (const r of revs) {
+        try { freed += fs.statSync(r).size; fs.rmSync(r); } catch { /* ignore */ }
+      }
+      for (const id of fs.existsSync(revDir) ? fs.readdirSync(revDir) : []) {
+        const d = path.join(revDir, id);
+        if (fs.statSync(d).isDirectory() && fs.readdirSync(d).length === 0) fs.rmdirSync(d);
+      }
+    }
+    return { dryRun, olderThanDays, tombstones: tombs.length, revisions: revs.length, freedBytes: freed };
+  }
 }

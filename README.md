@@ -1,4 +1,4 @@
-# Agent Memory Hub
+# Memory Hub MCP
 
 > 一个智能体的记忆，所有智能体都能用。
 
@@ -35,6 +35,15 @@
 
 本项目的取舍：**可读、可改、可版本化、可重建**，牺牲的是自动提取与语义检索。
 
+## 安装
+
+尚未发布到 npm，直接从源码用（无需 `npm install`）：
+
+```bash
+git clone <repo> agent-memory-hub && cd agent-memory-hub
+node src/cli.mjs init
+```
+
 ## 快速开始
 
 ```bash
@@ -53,7 +62,9 @@ node src/cli.mjs write \
 # 3. 中文检索（FTS5 trigram，≥3 字走全文索引）
 node src/cli.mjs search "智能体" --limit 5
 
-# 4. 统计 / 重建索引
+# 4. 体检 / 清理 / 重建
+node src/cli.mjs doctor                    # frontmatter、重复、断链、索引漂移
+node src/cli.mjs gc                        # 默认 dry-run，看清了再加 --yes
 node src/cli.mjs stats
 node src/cli.mjs rebuild
 ```
@@ -136,10 +147,16 @@ Resources：`memory://recent`、`memory://index`。
 
 ```bash
 node test/smoke.mjs
-# ✓ 12 项冒烟测试全部通过
+# ✓ 15 项冒烟测试全部通过
 ```
+
+CI 在 Node 22 / 24 / 26 三个版本上跑同一套测试。
 
 ## 项目状态
 
-见 [ROADMAP.md](ROADMAP.md)。当前 **v0.1 — P0/P1 完成**：存储、索引、CLI、MCP server、冒烟测试可用。
+见 [ROADMAP.md](ROADMAP.md)。当前 **v0.2**：存储、索引、CLI、MCP server、doctor/gc、示例配置、CI 可用。
+
+- License: MIT
+- 零运行时依赖
+- 数据默认在 `~/Memory`，可 `MEMORY_HOME` 覆盖
 设计文档见同目录 `../记忆中枢设计方案-2026-11-23.md`。
