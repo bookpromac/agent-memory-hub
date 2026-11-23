@@ -27,13 +27,28 @@
 - [x] `memhub migrate`（v1 → v2，自动备份）
 - [x] 旧 SQLite 库版本升级路径
 
-## v0.4 — 历史迁移（P3）
+## v0.4 — 多接口框架（已完成）
+
+- [x] 分层：store / tools / mcp / http / cli / adapters
+- [x] HTTP 守护进程 + Bearer token
+- [x] 适配器注册表（7 个）+ 本机检测 + 配置片段
+- [x] `memhub import` 粗导入
+- [x] HTTP 接口测试
+
+## v0.5 — 逐个接通（进行中）
+
+- [ ] 接通 DSH（MCP bundle）
+- [ ] 接通 Claude Code
+- [ ] 接通 Codex
+- [ ] 导入 OpenClaw/Hermes 历史并蒸馏
+
+## v0.6 — 历史迁移（P3）
 
 - [ ] `memhub import`：从 JSONL 会话抽取候选记忆（含 anchors/valid_from 推断）
 - [ ] 子代理批量蒸馏 imported-agents（48,725 条 → 目标 100–300 条）
 - [ ] 人工审核工作流（staging → accept/reject）
 
-## v0.5 — 运维（P4）
+## v0.7 — 运维（P4）
 
 - [ ] launchd 每日 `git commit`
 - [ ] `memhub stats --agent` 写入分布

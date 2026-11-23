@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 // 命令行入口：memhub <command>
 import fs from 'node:fs';
+import path from 'node:path';
+import readline from 'node:readline';
 import { MemoryStore, KINDS } from './store.mjs';
+import { listen } from './http.mjs';
+import { ADAPTERS, detectAdapters, renderSetup, getAdapter } from './adapters.mjs';
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -86,6 +90,68 @@ try {
       print(store.forget(args._[0], args.reason || ''));
       break;
     }
+    case 'serve': {
+      const port = Number(args.port || 7710);
+      const { port: actual, token } = await listen(store, { port });
+      print({
+        ok: true,
+        url: `http://127.0.0.1:${actual}`,
+        token_file: path.join(store.home, '.memory', 'token'),
+        token_preview: `${token.slice(0, 6)}…`,
+        note: '按 Ctrl+C 停止',
+      });
+      break;
+    }
+    case 'adapters': {
+      const sub = args._[0] || 'list';
+      if (sub === 'detect') { print(detectAdapters()); break; }
+      if (sub === 'show') {
+        const id = args._[1];
+        const a = getAdapter(id);
+        if (!a) { print({ error: `未知适配器 ${id}`, available: ADAPTERS.map((x) => x.id) }); process.exitCode = 1; break; }
+        print({ id: a.id, name: a.name, protocol: a.protocol, note: a.note, setup: renderSetup(id, { memoryHome: store.home, port: args.port }) });
+        break;
+      }
+      print(detectAdapters());
+      break;
+    }
+    case 'import': {
+      const file = args._[0];
+      if (!file) { print({ error: '用法：memhub import <messages.jsonl> --agent <name> [--limit 200]' }); process.exitCode = 1; break; }
+      const agent = args.agent || 'import';
+      const limit = Number(args.limit || 200);
+      const counts = { sessions: 0, written: 0, skipped: 0 };
+      const groups = new Map();
+      const rl = readline.createInterface({ input: fs.createReadStream(file, 'utf8'), crlfDelay: Infinity });
+      for await (const line of rl) {
+        if (!line.trim()) continue;
+        let row;
+        try { row = JSON.parse(line); } catch { continue; }
+        const sid = row.session || 'unknown';
+        if (!groups.has(sid)) groups.set(sid, []);
+        groups.get(sid).push(row);
+      }
+      for (const [sid, rows] of groups) {
+        if (counts.sessions >= limit) break;
+        counts.sessions++;
+        const body = rows
+          .slice(-40)
+          .map((r) => `- ${r.role || '?'}: ${String(r.text || '').slice(0, 300).replace(/\n/g, ' ')}`)
+          .join('\n')
+          .slice(0, 8000);
+        const res = store.writeNote({
+          kind: 'episodes',
+          title: `导入会话 ${sid}`,
+          body: `## 观察\n${body}`,
+          tags: ['import', agent],
+          confidence: 'low',
+          source: { agent, session: sid, trigger: 'import' },
+        });
+        if (res.duplicate) counts.skipped++; else counts.written++;
+      }
+      print({ file, agent, ...counts });
+      break;
+    }
     case 'rebuild': {
       print({ indexed: store.rebuild() });
       break;
@@ -135,10 +201,14 @@ try {
         + '  memhub verify                 # 校验哈希审计链\n'
         + '  memhub migrate [--yes]        # v1 → v2 升级（默认 dry-run，自动备份）\n'
         + '  memhub gc [--older-than 30] [--yes]   # 清理墓碑与旧修订（默认 dry-run）\n'
+        + '  memhub serve [--port 7710]    # 启动本机 HTTP 守护进程\n'
+        + '  memhub adapters [list|detect|show <id>]   # 各智能体的接入方式\n'
+        + '  memhub import <file.jsonl> --agent <name> [--limit 200]\n'
         + '  memhub rebuild | stats | path\n',
       );
       process.exitCode = 1;
   }
 } finally {
-  store?.close();
+  // serve 需要保持进程与数据库句柄存活
+  if (cmd !== 'serve') store?.close();
 }

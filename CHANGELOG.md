@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.4.0 — 2026-11-23
+
+### 新增
+- **框架分层**：`store`（核心）/ `tools`（契约）/ `mcp` · `http` · `cli`（接口）/ `adapters`（智能体接入）
+- **HTTP 守护进程**：`memhub serve`，仅监听 127.0.0.1，Bearer token 鉴权
+- **适配器注册表**：dsh / claude-code / codex / cursor / http / cli / import，含本机检测与配置片段生成
+- **`memhub adapters [list|detect|show <id>]`**
+- **`memhub import <jsonl>`**：把只能导出的智能体历史粗导入为记忆
+- 接口测试 9 项（鉴权、检索、写入、审计、错误码）
+
+### 变更
+- MCP 与 HTTP 共用 `src/tools.mjs` 契约，避免两套实现漂移
+
 ## v0.3.0 — 2026-11-23
 
 ### 新增

@@ -35,6 +35,20 @@
 
 本项目的取舍：**可读、可改、可版本化、可重建**，牺牲的是自动提取与语义检索。
 
+## 架构：一个记忆服务，多种接口
+
+```
+智能体（DSH / Claude Code / Codex / 脚本）
+        │
+   MCP · HTTP · CLI · 文件导入      ← 接口层
+        │
+     工具契约（mem_*）              ← tools.mjs
+        │
+   ~/Memory（Markdown + 审计链）    ← 核心
+```
+
+**存储只做一次，接口做多种，每个智能体只写一个适配器。** 详见 [docs/FRAMEWORK.md](docs/FRAMEWORK.md)。
+
 ## 安装
 
 尚未发布到 npm，直接从源码用（无需 `npm install`）：
@@ -62,7 +76,15 @@ node src/cli.mjs write \
 # 3. 中文检索（FTS5 trigram，≥3 字走全文索引）
 node src/cli.mjs search "智能体" --limit 5
 
-# 4. 体检 / 审计 / 清理
+# 4. 看本机有哪些智能体可以接
+node src/cli.mjs adapters detect
+node src/cli.mjs adapters show dsh      # 打印可直接粘贴的配置片段
+
+# 5. 需要 HTTP 接口时启动守护进程
+node src/cli.mjs serve --port 7710
+curl -s http://127.0.0.1:7710/health
+
+# 6. 体检 / 审计 / 清理
 node src/cli.mjs doctor                    # frontmatter、重复、断链、索引漂移
 node src/cli.mjs verify                    # 校验哈希审计链
 node src/cli.mjs gc                        # 默认 dry-run，看清了再加 --yes
@@ -181,7 +203,7 @@ CI 在 Node 22 / 24 / 26 三个版本上跑同一套测试。
 
 ## 项目状态
 
-见 [ROADMAP.md](ROADMAP.md)。当前 **v0.3**：Schema v2、哈希审计链、观察级检索、doctor/verify/migrate/gc、示例配置、CI 可用。
+见 [ROADMAP.md](ROADMAP.md)。当前 **v0.4**：三接口框架（MCP / HTTP / CLI）+ 7 个智能体适配器 + Schema v2 审计链。
 
 - License: MIT
 - 零运行时依赖
