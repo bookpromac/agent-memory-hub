@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.6.0 — 2026-11-23
+
+### 里程碑
+- **DeepSeek Harness 接通**：`mcp__memory__*` 6 个工具 + 3 个 resources 注册成功
+- 跨接口验证：CLI 写 → MCP 读、MCP 写 → CLI 读，同一份库
+- 本地会话的读取路径落地：工作区 `AGENTS.md` + `~/Memory/DIGEST.md`
+
+### 修复
+- DSH 适配器片段改为 `- insert:` 包裹（顶层行会被 Loader 静默忽略）
+- 文档记录两个坑：insert 包裹、新增行需重启
+
 ## v0.5.0 — 2026-11-23
 
 ### 新增

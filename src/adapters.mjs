@@ -19,16 +19,18 @@ export const ADAPTERS = [
     note: '通过 profile 的 cordis.patch.yml 挂载 dsh-mcp-client（stdio）',
     detect: () => homePath('.dsh', 'profiles', 'desktop', 'cordis.patch.yml'),
     setup: ({ memoryHome }) => `# 追加到 ~/.dsh/profiles/desktop/cordis.patch.yml
-- id: memory-hub
-  name: "@deepseek-ai/dsh-mcp-client"
-  config:
-    serverName: memory
-    transport: stdio
-    command: node
-    args: ["${MCP_ENTRY}"]
-    env:
-      MEMORY_HOME: "${memoryHome}"
-    failOnStartupError: true`,
+# 注意：新增行必须放在 insert: 列表里；顶层行只能覆盖已有 id
+- insert:
+    - id: memory-hub
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: memory
+        transport: stdio
+        command: node
+        args: ["${MCP_ENTRY}"]
+        env:
+          MEMORY_HOME: "${memoryHome}"
+        failOnStartupError: false`,
   },
   {
     id: 'claude-code',

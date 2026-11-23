@@ -159,14 +159,20 @@ assert.ok(fs.existsSync(mres.backup), '应生成备份目录');
 assert.equal(mstore.verify().ok, true);
 mstore.close();
 
-// 18. CLI：stats / verify 可用
+// 18. 适配器片段：DSH 必须使用 insert 包裹
+const { renderSetup } = await import('../src/adapters.mjs');
+const dshSnippet = renderSetup('dsh', { memoryHome: tmp });
+assert.match(dshSnippet, /- insert:/, 'DSH 片段必须使用 insert');
+assert.match(dshSnippet, /@deepseek-ai\/dsh-mcp-client/);
+
+// 19. CLI：stats / verify 可用
 const cli = path.join(import.meta.dirname, '..', 'src', 'cli.mjs');
 const stats = JSON.parse(execFileSync(process.execPath, [cli, 'stats'], { env: { ...process.env, MEMORY_HOME: tmp } }).toString());
 assert.ok(stats.total >= 2);
 const verifyOut = JSON.parse(execFileSync(process.execPath, [cli, 'verify'], { env: { ...process.env, MEMORY_HOME: tmp } }).toString());
 assert.equal(verifyOut.ok, true);
 
-// 19. MCP：握手 / 工具 / 审计资源
+// 20. MCP：握手 / 工具 / 审计资源
 const mcp = path.join(import.meta.dirname, '..', 'src', 'mcp.mjs');
 const input = [
   JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
@@ -187,4 +193,4 @@ assert.ok(audit.length >= 1 && audit[0].hash, '审计资源应返回链');
 
 fs.rmSync(tmp, { recursive: true, force: true });
 fs.rmSync(tmp2, { recursive: true, force: true });
-console.log('✓ 19 项冒烟测试全部通过');
+console.log('✓ 20 项冒烟测试全部通过');

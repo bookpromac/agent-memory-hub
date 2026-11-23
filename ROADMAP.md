@@ -43,7 +43,7 @@
 
 ## v0.6 — 逐个接通（进行中）
 
-- [ ] 接通 DSH（MCP bundle）
+- [x] 接通 DSH（MCP bundle）—— 2026-11-23 验证通过
 - [ ] 接通 Claude Code
 - [ ] 接通 Codex
 - [ ] 导入 OpenClaw/Hermes 历史并蒸馏
