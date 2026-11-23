@@ -90,6 +90,14 @@ try {
       print(store.forget(args._[0], args.reason || ''));
       break;
     }
+    case 'digest': {
+      const text = store.digest({ maxBytes: Number(args['max-bytes'] || 4096) });
+      if (args['dry-run']) { process.stdout.write(text); break; }
+      const out = args.out || path.join(store.home, 'DIGEST.md');
+      fs.writeFileSync(out, text);
+      print({ written: out, bytes: Buffer.byteLength(text), hint: '在 AGENTS.md / CLAUDE.md 里要求「先读 DIGEST.md」' });
+      break;
+    }
     case 'serve': {
       const port = Number(args.port || 7710);
       const { port: actual, token } = await listen(store, { port });
@@ -201,6 +209,7 @@ try {
         + '  memhub verify                 # 校验哈希审计链\n'
         + '  memhub migrate [--yes]        # v1 → v2 升级（默认 dry-run，自动备份）\n'
         + '  memhub gc [--older-than 30] [--yes]   # 清理墓碑与旧修订（默认 dry-run）\n'
+        + '  memhub digest [--dry-run] [--max-bytes 4096]   # 生成常驻读取摘要\n'
         + '  memhub serve [--port 7710]    # 启动本机 HTTP 守护进程\n'
         + '  memhub adapters [list|detect|show <id>]   # 各智能体的接入方式\n'
         + '  memhub import <file.jsonl> --agent <name> [--limit 200]\n'

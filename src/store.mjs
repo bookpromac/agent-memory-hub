@@ -133,6 +133,21 @@ export function serialize({ meta, body }) {
 
 // ---------- 工具函数 ----------
 
+
+/** 取正文里「## 结论」的第一句，作为摘要 */
+export function summaryOf(body) {
+  const text = String(body);
+  const m = /^##\s*结论\s*$/m.exec(text);
+  if (m) {
+    const rest = text.slice(m.index + m[0].length);
+    const next = /^##\s+/m.exec(rest);
+    const block = (next ? rest.slice(0, next.index) : rest).replace(/\s+/g, ' ').trim();
+    if (block) return block.slice(0, 120);
+  }
+  const first = text.replace(/^#+\s*/gm, '').replace(/\s+/g, ' ').trim();
+  return first.slice(0, 120);
+}
+
 export function slugify(title) {
   const s = String(title)
     .replace(/[\\/:*?"<>|\n\r\t]+/g, '-')
@@ -643,6 +658,64 @@ export class MemoryStore {
 
     const errors = problems.filter((p) => p.level === 'error').length;
     return { ok: errors === 0, files: files.length, indexed: rows.length, problems };
+  }
+
+
+  /**
+   * 生成「常驻读取」摘要：给智能体每次会话必读的几 KB 内容。
+   * 只读，不写库；由 CLI 决定是否落盘。
+   */
+  digest({ maxBytes = 4096, now = new Date() } = {}) {
+    const rows = this.db.prepare(
+      `SELECT id, kind, title, updated, anchors FROM notes
+       WHERE tombstoned = 0 AND (status IS NULL OR status = 'active')
+       ORDER BY updated DESC`,
+    ).all();
+
+    const items = rows.map((r) => {
+      const { body } = parseFrontmatter(fs.readFileSync(
+        this.db.prepare('SELECT path FROM notes WHERE id = ?').get(r.id).path, 'utf8',
+      ));
+      return { ...r, summary: summaryOf(body) };
+    });
+
+    const by = (k, n) => items.filter((i) => i.kind === k).slice(0, n);
+    const facts = by('facts', 6);
+    const prefs = by('preferences', 4);
+    const decisions = by('decisions', 5);
+    const entities = by('entities', 3);
+    const due = items.filter((i) => i.kind === 'decisions' && i.updated < new Date(Date.now() - 180 * 86400000).toISOString()).slice(0, 3);
+
+    const head = [
+      '# 长期记忆摘要（自动生成，勿手改）',
+      '',
+      `> 生成于 ${now.toISOString().slice(0, 16).replace('T', ' ')} · 库中共 ${items.length} 条 · 权威源：~/Memory/memories/`,
+      '> 需要细节时用 mem_search / 读对应文件；要写入用 mem_write。',
+      '',
+    ].join('\n');
+
+    const line = (i) => `- ${i.title}：${i.summary}（${i.updated.slice(0, 10)} · ${i.id.slice(-6)}）`;
+
+    const sections = [
+      ['## 生效事实', facts],
+      ['## 偏好与约定', prefs],
+      ['## 关键实体', entities],
+      ['## 最近决策', decisions],
+    ];
+
+    let out = head;
+    for (const [title, list] of sections) {
+      if (!list.length) continue;
+      const block = `\n${title}\n${list.map(line).join('\n')}\n`;
+      if (Buffer.byteLength(out + block) > maxBytes) break;
+      out += block;
+    }
+    if (due.length) {
+      const block = `\n## 待复核（超过 180 天未更新）\n${due.map(line).join('\n')}\n`;
+      if (Buffer.byteLength(out + block) <= maxBytes) out += block;
+    }
+    if (Buffer.byteLength(out) > maxBytes) out = out.slice(0, maxBytes);
+    return out;
   }
 
   gc({ olderThanDays = 30, dryRun = true } = {}) {

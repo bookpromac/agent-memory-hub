@@ -35,20 +35,26 @@
 - [x] `memhub import` 粗导入
 - [x] HTTP 接口测试
 
-## v0.5 — 逐个接通（进行中）
+## v0.5 — 读取路径（已完成）
+
+- [x] `memhub digest`：常驻读取摘要（≤4KB，按优先级截断）
+- [x] 摘要写进 AGENTS.md / CLAUDE.md 的约定模板
+- [ ] 会话启动自动注入（依赖宿主插件）
+
+## v0.6 — 逐个接通（进行中）
 
 - [ ] 接通 DSH（MCP bundle）
 - [ ] 接通 Claude Code
 - [ ] 接通 Codex
 - [ ] 导入 OpenClaw/Hermes 历史并蒸馏
 
-## v0.6 — 历史迁移（P3）
+## v0.7 — 历史迁移（P3）
 
 - [ ] `memhub import`：从 JSONL 会话抽取候选记忆（含 anchors/valid_from 推断）
 - [ ] 子代理批量蒸馏 imported-agents（48,725 条 → 目标 100–300 条）
 - [ ] 人工审核工作流（staging → accept/reject）
 
-## v0.7 — 运维（P4）
+## v0.8 — 运维（P4）
 
 - [ ] launchd 每日 `git commit`
 - [ ] `memhub stats --agent` 写入分布

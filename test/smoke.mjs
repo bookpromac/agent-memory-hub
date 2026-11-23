@@ -102,7 +102,19 @@ const n = store.rebuild();
 assert.ok(n >= 2);
 assert.equal(store.verify().ok, true, '重建后链应完整');
 
-// 14. doctor 干净；坏文件能发现
+// 14. digest：常驻读取摘要
+store.writeNote({
+  kind: 'preferences', title: '输出用中文', body: '## 结论\n回答默认使用简体中文，简洁直接。',
+  confidence: 'high', source: { agent: 'dsh' },
+});
+const dg = store.digest({ maxBytes: 2048 });
+assert.match(dg, /^# 长期记忆摘要/);
+assert.match(dg, /## 生效事实/);
+assert.match(dg, /## 偏好与约定/);
+assert.ok(Buffer.byteLength(dg) <= 2048, '必须在字节预算内');
+assert.match(dg, /输出用中文/);
+
+// 15. doctor 干净；坏文件能发现
 assert.equal(store.doctor().ok, true, JSON.stringify(store.doctor().problems));
 const bad = path.join(tmp, 'memories', 'facts', '2026-11', 'broken.md');
 fs.mkdirSync(path.dirname(bad), { recursive: true });
@@ -113,11 +125,11 @@ assert.ok(d.problems.some((p) => p.code === 'missing-id'));
 assert.ok(d.problems.some((p) => p.code === 'missing-source'));
 fs.rmSync(bad);
 
-// 15. gc 默认 dry-run
+// 16. gc 默认 dry-run
 assert.equal(store.gc().dryRun, true);
 store.close();
 
-// 16. 迁移：v1 文件升级为 v2 并自动备份
+// 17. 迁移：v1 文件升级为 v2 并自动备份
 const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'memhub-mig-'));
 const oldFile = path.join(tmp2, 'memories', 'facts', '2026-01', 'old.md');
 fs.mkdirSync(path.dirname(oldFile), { recursive: true });
@@ -147,14 +159,14 @@ assert.ok(fs.existsSync(mres.backup), '应生成备份目录');
 assert.equal(mstore.verify().ok, true);
 mstore.close();
 
-// 17. CLI：stats / verify 可用
+// 18. CLI：stats / verify 可用
 const cli = path.join(import.meta.dirname, '..', 'src', 'cli.mjs');
 const stats = JSON.parse(execFileSync(process.execPath, [cli, 'stats'], { env: { ...process.env, MEMORY_HOME: tmp } }).toString());
 assert.ok(stats.total >= 2);
 const verifyOut = JSON.parse(execFileSync(process.execPath, [cli, 'verify'], { env: { ...process.env, MEMORY_HOME: tmp } }).toString());
 assert.equal(verifyOut.ok, true);
 
-// 18. MCP：握手 / 工具 / 审计资源
+// 19. MCP：握手 / 工具 / 审计资源
 const mcp = path.join(import.meta.dirname, '..', 'src', 'mcp.mjs');
 const input = [
   JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
@@ -175,4 +187,4 @@ assert.ok(audit.length >= 1 && audit[0].hash, '审计资源应返回链');
 
 fs.rmSync(tmp, { recursive: true, force: true });
 fs.rmSync(tmp2, { recursive: true, force: true });
-console.log('✓ 18 项冒烟测试全部通过');
+console.log('✓ 19 项冒烟测试全部通过');

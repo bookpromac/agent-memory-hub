@@ -153,6 +153,29 @@ node src/cli.mjs migrate --yes    # 真正执行
 - 绝不写入密码或密钥
 ```
 
+## 读取路径（比写入更容易被忽略）
+
+能力 ≠ 行为。有 `mem_search` 不代表智能体会去调它。所以读取分三层：
+
+| 层 | 机制 | 可靠性 | 命令 |
+|---|---|---|---|
+| 常驻读取 | 几 KB 摘要进上下文 | 最高（不靠自觉） | `memhub digest` → `~/Memory/DIGEST.md` |
+| 按需检索 | 智能体主动调工具 | 中 | `mem_search` |
+| 自动注入 | 宿主在会话启动时注入 | 高 | 待做（DSH prompt context） |
+
+```bash
+node src/cli.mjs digest              # 生成 ~/Memory/DIGEST.md（≤4KB）
+node src/cli.mjs digest --dry-run    # 只打印不落盘
+```
+
+然后在 `AGENTS.md` / `CLAUDE.md` 里写一句就够：
+
+```markdown
+每次会话开始，先读 ~/Memory/DIGEST.md。
+```
+
+摘要按「生效事实 → 偏好 → 关键实体 → 最近决策 → 待复核」排序，超出字节预算时按优先级截断。
+
 ## 审计链
 
 每次写入都会链接上一条：
@@ -211,7 +234,7 @@ CI 在 Node 22 / 24 / 26 三个版本上跑同一套测试。
 
 ## 项目状态
 
-见 [ROADMAP.md](ROADMAP.md)。当前 **v0.4**：三接口框架（MCP / HTTP / CLI）+ 7 个智能体适配器 + Schema v2 审计链。
+见 [ROADMAP.md](ROADMAP.md)。当前 **v0.5**：三接口框架 + 7 个适配器 + 审计链 + **常驻读取摘要**（`memhub digest`）。
 
 - License: MIT
 - 零运行时依赖
