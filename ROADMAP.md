@@ -13,7 +13,7 @@
 
 - [x] `memhub doctor`：frontmatter 校验、孤儿链接、索引漂移检测
 - [x] `memhub gc`：清理墓碑与过期 revisions（默认 dry-run）
-- [ ] DSH 配置式 bundle 落地并验证 `mem_search` 可用
+- [x] DSH 配置式 bundle 落地并验证 `mem_search` 可用
 - [x] Claude Code / Codex 接入样例（`examples/`）
 - [x] 适配文件模板：AGENTS.md / .cursor/rules
 - [ ] 会话开场自动注入最近 5 条（DSH prompt context 插件）
@@ -46,7 +46,7 @@
 - [x] 接通 DSH（MCP bundle）—— 2026-11-23 验证通过
 - [~] 接通 Claude Code —— MCP 已注册并 Connected，端到端待鉴权
 - [ ] 接通 Codex
-- [ ] 导入 OpenClaw/Hermes 历史并蒸馏
+- [x] 导入 Hermes 历史并蒸馏（86 条）
 
 ## v0.7 — 历史迁移（已完成）
 
@@ -56,7 +56,7 @@
 
 
 - [ ] `memhub import`：从 JSONL 会话抽取候选记忆（含 anchors/valid_from 推断）
-- [ ] 子代理批量蒸馏 imported-agents（48,725 条 → 目标 100–300 条）
+- [x] 子代理批量蒸馏（Hermes 155 会话 → 86 条）
 - [ ] 人工审核工作流（staging → accept/reject）
 
 ## v0.7 — 多仓库架构（已上线）
@@ -69,7 +69,7 @@
 
 ## v0.8 — 运维（P4）
 
-- [ ] launchd 每日 `git commit`
+- [x] launchd 定时同步（摘要刷新 + 会话沉淀）
 - [ ] `memhub stats --agent` 写入分布
 - [x] 备份/恢复文档（见 README「运维」待补）
 - [ ] 索引重建性能基准
