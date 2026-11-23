@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.9.1 — 2026-11-23
+
+### 备份（T-008）
+- `memhub backup`：提交各 agent 仓库 → 打包快照 → 保留最近 7 个
+- `memhub snapshots` / `memhub restore <snap> [--to dir]`：列出与恢复（**不覆盖原库**）
+- 快照排除 backups/、临时文件与 `.memory/token`
+- launchd 每日 03:00 自动备份：`com.local.memory-hub.backup`
+- 快照命名精确到毫秒，避免同秒覆盖
+
 ## v0.9.0 — 2026-11-23
 
 ### 治理（T-004 / T-005）

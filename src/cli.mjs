@@ -7,6 +7,7 @@ import { MemoryStore, KINDS } from './store.mjs';
 import { listen } from './http.mjs';
 import { ingest, embedDigest } from './dsh.mjs';
 import { listAgents, ensureAgent, migrateMulti, project } from './hub.mjs';
+import { backup, restore, listSnapshots } from './backup.mjs';
 import { ADAPTERS, detectAdapters, renderSetup, getAdapter } from './adapters.mjs';
 
 function parseArgs(argv) {
@@ -109,6 +110,20 @@ try {
     }
     case 'project': {
       print(project(store, { owners: args.owners ? String(args.owners).split(',') : null }));
+      break;
+    }
+    case 'backup': {
+      print(backup(store, { keep: Number(args.keep || 7) }));
+      break;
+    }
+    case 'snapshots': {
+      print(listSnapshots(store));
+      break;
+    }
+    case 'restore': {
+      const snap = args._[1];
+      if (!snap) { print({ error: '用法：memhub restore <snapshot.tar.gz> [--to <dir>]' }); process.exitCode = 1; break; }
+      print(restore(store, snap, { to: args.to || null }));
       break;
     }
     case 'review': {
@@ -268,6 +283,9 @@ try {
         + '  memhub dsh sync [--no-embed] [--no-ingest]     # 接管 DSH：摘要嵌入 AGENTS.md + 会话沉淀\n'
         + '  memhub serve [--port 7710]    # 启动本机 HTTP 守护进程\n'
         + '  memhub adapters [list|detect|show <id>]   # 各智能体的接入方式\n'
+        + '  memhub backup [--keep 7]      # 提交各仓库 + 打包快照 + 轮转\n'
+        + '  memhub snapshots              # 列出快照\n'
+        + '  memhub restore <snap> [--to d]  # 恢复到指定目录（不覆盖原库）\n'
         + '  memhub review                 # 治理体检：重复 / 过期 / 孤立\n'
         + '  memhub archive <id[,id]> [--yes]  # 归档（移出活跃集，不删除）\n'
         + '  memhub health                 # 健康指标：hot/warm/archived、使用率\n'

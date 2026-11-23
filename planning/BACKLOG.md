@@ -26,13 +26,13 @@
 | T-004 | 治理命令：review / archive / health | done | P1 | 4h | 能列出重复/过期/冲突；archive 可回滚；health 输出指标 |
 | T-005 | 访问计数与衰减评分 | done | P1 | 2h | mem_get/mem_search 更新 uses；score 可计算并用于排序 |
 | T-006 | 86 条导入记忆抽查（≥20 条） | done | P1 | 1h | 抽查准确率 ≥90%，错误条目修订或 forget |
-| T-007 | 手机号等敏感信息脱敏 | todo | P2 | 0.5h | 记忆库中无完整手机号；提供脱敏命令 |
+| T-007 | 手机号等敏感信息脱敏 | dropped | P2 | 0.5h | 记忆库中无完整手机号；提供脱敏命令 |
 
 ## E5 运维 — 定时任务、备份、可观测、可回滚
 
 | ID | 任务 | 状态 | 优先级 | 估时 | 验收 |
 |---|---|---|---|---|---|
-| T-008 | 每日 git 提交与备份 | todo | P2 | 1h | launchd 每日提交各 agent 仓库；备份可通过脚本恢复 |
+| T-008 | 每日 git 提交与备份 | done | P2 | 1h | launchd 每日提交各 agent 仓库；备份可通过脚本恢复 |
 | T-009 | 并发写与 10k 条性能基准 | todo | P3 | 2h | 两 agent 并发写 100 条不丢；10k 条检索 <500ms |
 
 ## E6 发布 — 文档、License、CI、npm/GitHub 可发布
