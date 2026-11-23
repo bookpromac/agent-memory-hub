@@ -105,6 +105,7 @@ HTTP 只监听 `127.0.0.1`，不开局域网端口——这是对之前 8001/180
 | `claude-code` | Claude Code / Desktop | MCP | ✅ 已装 |
 | `codex` | Codex CLI | MCP | ✅ 已装 |
 | `cursor` | Cursor | MCP | ❌ 未装 |
+| `openclaw` | OpenClaw | MCP | ✅ 已装（2026.11.7）|
 | `http` | 脚本 / 自定义 | HTTP | — |
 | `cli` | shell / cron | CLI | — |
 | `import` | 只能导出的产品 | 文件 | ✅ 有导出目录 |

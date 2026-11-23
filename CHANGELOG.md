@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.9.4 — 2026-11-23
+
+### OpenClaw 接口
+- 本机重新安装 OpenClaw 2026.11.7（npm，之前清理时删除）
+- `openclaw mcp add memory` 注册为 OpenClaw 管理的 MCP 服务器（stdio）
+- `openclaw mcp probe memory` 验证：6 工具 + resources，工具名 `memory__mem_*`
+- 指令文件：`~/.openclaw/workspace/AGENTS.md`（先读 DIGEST、用 memory__ 工具、source_agent=openclaw）
+- 适配器新增 `openclaw`（`memhub adapters show openclaw` 输出注册命令）
+- 未验证：agent 实际调用（缺模型凭据）
+
 ## v0.9.3 — 2026-11-23
 
 ### 性能（T-009）
