@@ -33,11 +33,11 @@
 | ID | 任务 | 状态 | 优先级 | 估时 | 验收 |
 |---|---|---|---|---|---|
 | T-008 | 每日 git 提交与备份 | done | P2 | 1h | launchd 每日提交各 agent 仓库；备份可通过脚本恢复 |
-| T-009 | 并发写与 10k 条性能基准 | todo | P3 | 2h | 两 agent 并发写 100 条不丢；10k 条检索 <500ms |
+| T-009 | 并发写与 10k 条性能基准 | done | P3 | 2h | 两 agent 并发写 100 条不丢；10k 条检索 <500ms |
 
 ## E6 发布 — 文档、License、CI、npm/GitHub 可发布
 
 | ID | 任务 | 状态 | 优先级 | 估时 | 验收 |
 |---|---|---|---|---|---|
-| T-010 | 发布到 GitHub 并打 tag | todo | P2 | 2h | 仓库公开、README 完整、有 v1.0.0 tag |
+| T-010 | 发布到 GitHub 并打 tag | done | P2 | 2h | 仓库公开、README 完整、有 v1.0.0 tag |
 | T-011 | 英文 README 与安装说明 | done | P3 | 2h | 英文 README 覆盖安装/接入/工具说明 |

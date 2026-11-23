@@ -39,15 +39,19 @@ for (let i = 0; i < 100; i++) {
 lat.sort((a, b) => a - b);
 const p50 = lat[50]; const p95 = lat[95]; const max = lat[99];
 
-// 并发：两个子进程各写 50 条
-const child = `
-const {MemoryStore}=require(${JSON.stringify(path.join(process.cwd(), 'src/store.mjs'))});
-const s=new MemoryStore(process.env.H,{agent:'conc'});
-for(let i=0;i<50;i++) s.writeNote({kind:'facts',title:'并发'+process.pid+'-'+i,body:'## 结论\\n并发写 '+i,source:{agent:'conc'},confidence:'high'});
+// 并发：两个子进程各写 50 条（写到临时 .mjs，避免 ESM 下 require 不可用）
+const childFile = path.join(home, 'conc.mjs');
+fs.writeFileSync(childFile, `
+import { MemoryStore } from ${JSON.stringify(path.join(process.cwd(), 'src/store.mjs'))};
+const s = new MemoryStore(process.env.H, { agent: 'conc' });
+for (let i = 0; i < 50; i++) {
+  const nl = String.fromCharCode(10);
+  s.writeNote({ kind: 'facts', title: '并发' + process.pid + '-' + i, body: '## 结论' + nl + '并发写 ' + process.pid + ':' + i, source: { agent: 'conc' }, confidence: 'high' });
+}
 s.close();
-`;
+`);
 const c0 = Date.now();
-const ps = [1, 2].map(() => execFileSync(process.execPath, ['--input-type=module', '-e', child], { env: { ...process.env, H: home }, stdio: 'ignore' }));
+for (let k = 0; k < 2; k++) execFileSync(process.execPath, [childFile], { env: { ...process.env, H: home }, stdio: 'ignore' });
 const concMs = Date.now() - c0;
 store2.rebuild();
 const concCount = store2.db.prepare("SELECT COUNT(*) c FROM notes WHERE owner='conc'").get().c;

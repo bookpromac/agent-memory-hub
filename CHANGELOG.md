@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.3 — 2026-11-23
+
+### 性能（T-009）
+- SQLite `synchronous=NORMAL`（WAL 下进程崩溃安全，写入提升约 4 倍）
+- 基准脚本 `scripts/bench.mjs`：2000 条 → 写入 49 条/秒、重建 1.8 秒、检索 p50 1ms / p95 4ms
+- 并发写验证：两个进程各写 50 条，100/100 无丢失（4.7 秒）
+
+### 发布（T-010）
+- 公开仓库：https://github.com/bookpromac/agent-memory-hub
+- 标签：v0.9.2（首次发布）
+
 ## v0.9.2 — 2026-11-23
 
 ### 会话注入（T-003）

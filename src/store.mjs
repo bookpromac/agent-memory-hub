@@ -237,6 +237,8 @@ export class MemoryStore {
     this.db = new DatabaseSync(this.dbPath);
     this.db.exec('PRAGMA journal_mode = WAL');
     this.db.exec('PRAGMA busy_timeout = 5000');
+    // WAL + NORMAL：进程崩溃安全（丢电最多丢最后一个事务），写入快一个数量级
+    this.db.exec('PRAGMA synchronous = NORMAL');
     this.#migrate();
   }
 
