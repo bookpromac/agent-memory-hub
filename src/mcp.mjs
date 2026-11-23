@@ -37,6 +37,8 @@ const TOOLS = [
         body: { type: 'string', description: 'Markdown 正文，建议包含「## 结论」段落' },
         tags: { type: 'array', items: { type: 'string' } },
         confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+        anchors: { type: 'array', items: { type: 'string' }, description: '1–3 个检索锚词，省略则自动生成' },
+        valid_from: { type: 'string', description: '事实开始为真的日期 YYYY-MM-DD' },
         source_agent: { type: 'string' },
         source_session: { type: 'string' },
         links: {
@@ -87,7 +89,7 @@ function callTool(name, a = {}) {
         kind: a.kind, title: a.title, body: a.body,
         tags: a.tags || [], confidence: a.confidence || 'medium',
         source: { agent: a.source_agent, session: a.source_session || '', trigger: 'mcp' },
-        links: a.links || [],
+        links: a.links || [], anchors: a.anchors, valid_from: a.valid_from,
       });
     case 'mem_revise':
       return store.revise(a.id, a.body, a.reason || '');
@@ -134,12 +136,19 @@ function handle(msg) {
         resources: [
           { uri: 'memory://recent', name: '最近记忆', mimeType: 'application/json' },
           { uri: 'memory://index', name: '记忆目录', mimeType: 'application/json' },
+          { uri: 'memory://audit', name: '审计链', mimeType: 'application/json' },
         ],
       });
     case 'resources/read': {
       const uri = params?.uri;
       if (uri === 'memory://recent') {
         return reply(id, { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(store.recent({ limit: 20 }), null, 2) }] });
+      }
+      if (uri === 'memory://audit') {
+        const chain = store.db.prepare(
+          'SELECT id, kind, title, created, hash, prev_hash FROM notes WHERE hash IS NOT NULL ORDER BY created',
+        ).all();
+        return reply(id, { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(chain, null, 2) }] });
       }
       if (uri === 'memory://index') {
         const rows = store.db.prepare('SELECT id, kind, title, tags FROM notes WHERE tombstoned = 0 ORDER BY updated DESC').all();

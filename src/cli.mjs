@@ -51,6 +51,8 @@ try {
           trigger: args.trigger || 'manual',
         },
         links: args.link ? [{ rel: args.rel || 'about', target: args.link }] : [],
+        anchors: args.anchors ? String(args.anchors).split(',').map((x) => x.trim()).filter(Boolean) : undefined,
+        valid_from: args['valid-from'] || undefined,
       });
       print(res);
       break;
@@ -94,6 +96,16 @@ try {
       if (!res.ok) process.exitCode = 1;
       break;
     }
+    case 'verify': {
+      const res = store.verify();
+      print(res);
+      if (!res.ok) process.exitCode = 1;
+      break;
+    }
+    case 'migrate': {
+      print(store.migrate({ apply: Boolean(args.yes || args.apply) }));
+      break;
+    }
     case 'gc': {
       print(store.gc({
         olderThanDays: Number(args['older-than'] || 30),
@@ -120,6 +132,8 @@ try {
         + '  memhub revise <id> --body-file - --reason "为何改"\n'
         + '  memhub forget <id> --reason "为何弃用"\n'
         + '  memhub doctor                 # 体检：frontmatter/重复/断链/索引漂移\n'
+        + '  memhub verify                 # 校验哈希审计链\n'
+        + '  memhub migrate [--yes]        # v1 → v2 升级（默认 dry-run，自动备份）\n'
         + '  memhub gc [--older-than 30] [--yes]   # 清理墓碑与旧修订（默认 dry-run）\n'
         + '  memhub rebuild | stats | path\n',
       );

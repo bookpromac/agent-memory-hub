@@ -1,4 +1,4 @@
-// 核心存储层：Markdown 为事实源，SQLite FTS5 为可重建索引。
+// 核心存储层 v2：Markdown 事实源 + SQLite FTS5 索引 + 哈希审计链。
 // 零外部依赖：仅使用 Node 内置的 node:sqlite。
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,20 +8,16 @@ import { DatabaseSync } from 'node:sqlite';
 
 export const KINDS = ['facts', 'preferences', 'entities', 'decisions', 'episodes'];
 export const CONFIDENCE = ['high', 'medium', 'low'];
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
-/** 生成 ULID：时间戳(10) + 随机(16)，可按时间排序 */
 export function ulid(now = Date.now()) {
   let t = '';
   let n = now;
-  for (let i = 0; i < 10; i++) {
-    t = CROCKFORD[n % 32] + t;
-    n = Math.floor(n / 32);
-  }
-  let r = '';
+  for (let i = 0; i < 10; i++) { t = CROCKFORD[n % 32] + t; n = Math.floor(n / 32); }
   const bytes = crypto.randomBytes(16);
+  let r = '';
   for (let i = 0; i < 16; i++) r += CROCKFORD[bytes[i] % 32];
   return t + r;
 }
@@ -30,7 +26,7 @@ export function memoryHome() {
   return process.env.MEMORY_HOME || path.join(os.homedir(), 'Memory');
 }
 
-// ---------- frontmatter 的最小 YAML 子集 ----------
+// ---------- frontmatter 最小 YAML 子集 ----------
 
 function parseScalar(v) {
   const s = String(v).trim();
@@ -38,9 +34,7 @@ function parseScalar(v) {
   if (s.startsWith('[') && s.endsWith(']')) {
     return s.slice(1, -1).split(',').map((x) => parseScalar(x)).filter((x) => x !== '');
   }
-  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
-    return s.slice(1, -1);
-  }
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) return s.slice(1, -1);
   if (s === 'null' || s === '~') return null;
   if (s === 'true') return true;
   if (s === 'false') return false;
@@ -59,7 +53,6 @@ function parseBlock(src) {
     const key = m[1];
     const rest = m[2];
     if (rest.trim() !== '') { out[key] = parseScalar(rest); i++; continue; }
-
     const items = [];
     const map = {};
     let mode = null;
@@ -94,9 +87,7 @@ export function parseFrontmatter(raw) {
   if (!text.startsWith('---\n')) return { meta: {}, body: text };
   const end = text.indexOf('\n---', 4);
   if (end === -1) return { meta: {}, body: text };
-  const fm = text.slice(4, end);
-  const body = text.slice(end + 4).replace(/^\n+/, '');
-  return { meta: parseBlock(fm), body };
+  return { meta: parseBlock(text.slice(4, end)), body: text.slice(end + 4).replace(/^\n+/, '') };
 }
 
 function quoteIfNeeded(v) {
@@ -111,26 +102,30 @@ export function serialize({ meta, body }) {
   L.push(`title: ${quoteIfNeeded(meta.title)}`);
   L.push(`created: ${meta.created}`);
   L.push(`updated: ${meta.updated}`);
+  if (meta.valid_from) L.push(`valid_from: ${meta.valid_from}`);
+  if (meta.valid_to) L.push(`valid_to: ${meta.valid_to}`);
   L.push(`tags: [${(meta.tags || []).join(', ')}]`);
+  L.push(`anchors: [${(meta.anchors || []).join(', ')}]`);
   L.push(`confidence: ${meta.confidence}`);
   if (meta.review_at) L.push(`review_at: ${meta.review_at}`);
   if (meta.status) L.push(`status: ${meta.status}`);
   if (meta.supersedes) L.push(`supersedes: ${meta.supersedes}`);
-  L.push('source:');
   const src = meta.source || {};
-  for (const [k, v] of Object.entries(src)) {
-    if (v === undefined || v === null || v === '') continue;
-    L.push(`  ${k}: ${quoteIfNeeded(v)}`);
+  if (Object.keys(src).length) {
+    L.push('source:');
+    for (const [k, v] of Object.entries(src)) {
+      if (v === undefined || v === null || v === '') continue;
+      L.push(`  ${k}: ${quoteIfNeeded(v)}`);
+    }
   }
   const links = meta.links || [];
   if (links.length) {
     L.push('links:');
-    for (const lk of links) {
-      L.push(`  - rel: ${lk.rel}`);
-      L.push(`    target: ${lk.target}`);
-    }
+    for (const lk of links) { L.push(`  - rel: ${lk.rel}`); L.push(`    target: ${lk.target}`); }
   }
-  L.push(`schema: ${SCHEMA_VERSION}`);
+  if (meta.prev_hash !== undefined) L.push(`prev_hash: ${meta.prev_hash || '""'}`);
+  if (meta.hash) L.push(`hash: ${meta.hash}`);
+  L.push(`schema: ${meta.schema || SCHEMA_VERSION}`);
   L.push('---', '');
   L.push(String(body).trim(), '');
   return L.join('\n');
@@ -148,8 +143,44 @@ export function slugify(title) {
   return s || 'note';
 }
 
-function sha256(s) {
+export function sha256(s) {
   return crypto.createHash('sha256').update(s).digest('hex');
+}
+
+function normalizeBody(body) {
+  return String(body).replace(/\s+/g, ' ').trim();
+}
+
+/** 审计链哈希：可从文件字段完整复算 */
+export function noteHash({ prev_hash = '', id, created, agent = '', body }) {
+  return sha256(JSON.stringify([prev_hash || '', id, created, agent || '', normalizeBody(body)]));
+}
+
+/** 从正文提取「## 观察」下的条目；没有则整篇作为一条观察 */
+export function observationsOf(body) {
+  const text = String(body);
+  const m = /^##\s*观察\s*$/m.exec(text);
+  if (!m) {
+    const firstPara = normalizeBody(text).slice(0, 240);
+    return [{ ord: 0, text: firstPara || '（空）' }];
+  }
+  const rest = text.slice(m.index + m[0].length);
+  const next = /^##\s+/m.exec(rest);
+  const block = next ? rest.slice(0, next.index) : rest;
+  const out = [];
+  for (const line of block.split('\n')) {
+    const b = /^\s*[-*]\s+(.*)$/.exec(line);
+    if (b && b[1].trim()) out.push({ ord: out.length, text: b[1].trim() });
+  }
+  if (!out.length) return [{ ord: 0, text: normalizeBody(block).slice(0, 240) || '（空）' }];
+  return out;
+}
+
+/** 无模型时的锚词启发式：标题分片 + 标签 */
+export function deriveAnchors(title, tags = []) {
+  const parts = String(title).split(/[\s，,、:：()（）\[\]【】]+/).filter((s) => s.length >= 2);
+  const set = new Set([...parts.slice(0, 2), ...tags.slice(0, 2)]);
+  return [...set].slice(0, 3);
 }
 
 function writeAtomic(file, content) {
@@ -167,9 +198,7 @@ const SECRET_PATTERNS = [
 ];
 
 export function assertNoSecrets(text) {
-  for (const re of SECRET_PATTERNS) {
-    if (re.test(text)) throw new Error('记忆内容疑似包含密钥，已拒绝写入');
-  }
+  for (const re of SECRET_PATTERNS) if (re.test(text)) throw new Error('记忆内容疑似包含密钥，已拒绝写入');
 }
 
 // ---------- 存储 ----------
@@ -195,52 +224,80 @@ export class MemoryStore {
         title TEXT NOT NULL,
         created TEXT NOT NULL,
         updated TEXT NOT NULL,
+        valid_from TEXT,
+        valid_to TEXT,
         confidence TEXT NOT NULL,
         review_at TEXT,
         source_agent TEXT,
         source_session TEXT,
-        content_hash TEXT NOT NULL,
+        anchors TEXT,
+        prev_hash TEXT,
+        hash TEXT,
+        status TEXT,
         tombstoned INTEGER NOT NULL DEFAULT 0
       );
       CREATE TABLE IF NOT EXISTS links (
-        from_id TEXT NOT NULL,
-        rel TEXT NOT NULL,
-        to_id TEXT NOT NULL,
+        from_id TEXT NOT NULL, rel TEXT NOT NULL, to_id TEXT NOT NULL,
         PRIMARY KEY (from_id, rel, to_id)
       );
-      CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
-        id UNINDEXED, title, body, tags, tokenize = 'trigram'
+      CREATE TABLE IF NOT EXISTS observations (
+        doc_id TEXT NOT NULL, ord INTEGER NOT NULL, text TEXT NOT NULL,
+        PRIMARY KEY (doc_id, ord)
+      );
+      CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+      CREATE VIRTUAL TABLE IF NOT EXISTS obs_fts USING fts5(
+        doc_id UNINDEXED, ord UNINDEXED, text, tokenize = 'trigram'
       );
     `);
   }
 
   close() { this.db.close(); }
 
-  #index(id, file, meta, body) {
-    const tags = (meta.tags || []).join(' ');
+  #meta(key, fallback = null) {
+    const r = this.db.prepare('SELECT value FROM meta WHERE key = ?').get(key);
+    return r ? r.value : fallback;
+  }
+
+  #setMeta(key, value) {
+    this.db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)').run(key, String(value));
+  }
+
+  #indexNote({ id, file, meta, body, hash, prev_hash }) {
     const tombstoned = meta.status === 'tombstoned' ? 1 : 0;
     this.db.prepare(
       `INSERT OR REPLACE INTO notes
-       (id, path, kind, title, created, updated, confidence, review_at, source_agent, source_session, content_hash, tombstoned)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+       (id, path, kind, title, created, updated, valid_from, valid_to, confidence, review_at,
+        source_agent, source_session, anchors, prev_hash, hash, status, tombstoned)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     ).run(
       id, file, meta.kind, meta.title, meta.created, meta.updated,
+      meta.valid_from || null, meta.valid_to || null,
       meta.confidence, meta.review_at || null,
       meta.source?.agent || null, meta.source?.session || null,
-      sha256(String(body).replace(/\s+/g, ' ').trim()), tombstoned,
+      (meta.anchors || []).join(' '), prev_hash || null, hash || null, meta.status || 'active', tombstoned,
     );
-    this.db.prepare('DELETE FROM notes_fts WHERE id = ?').run(id);
+
+    this.db.prepare('DELETE FROM observations WHERE doc_id = ?').run(id);
+    this.db.prepare('DELETE FROM obs_fts WHERE doc_id = ?').run(id);
     if (!tombstoned) {
-      this.db.prepare('INSERT INTO notes_fts (id, title, body, tags) VALUES (?,?,?,?)')
-        .run(id, meta.title, body, tags);
+      const obs = observationsOf(body);
+      const ins = this.db.prepare('INSERT INTO observations (doc_id, ord, text) VALUES (?,?,?)');
+      const insFts = this.db.prepare('INSERT INTO obs_fts (doc_id, ord, text) VALUES (?,?,?)');
+      for (const o of obs) {
+        ins.run(id, o.ord, o.text);
+        // 锚词并入该文档首条观察的检索文本，提升同义召回
+        const extra = o.ord === 0 && (meta.anchors || []).length ? ` ${meta.anchors.join(' ')}` : '';
+        insFts.run(id, o.ord, o.text + extra);
+      }
     }
+
+    this.db.prepare('DELETE FROM links WHERE from_id = ?').run(id);
     for (const lk of meta.links || []) {
-      this.db.prepare('INSERT OR IGNORE INTO links (from_id, rel, to_id) VALUES (?,?,?)')
-        .run(id, lk.rel, lk.target);
+      this.db.prepare('INSERT OR IGNORE INTO links (from_id, rel, to_id) VALUES (?,?,?)').run(id, lk.rel, lk.target);
     }
   }
 
-  writeNote({ kind, title, body, tags = [], confidence = 'medium', source = {}, links = [] }) {
+  writeNote({ kind, title, body, tags = [], anchors, confidence = 'medium', source = {}, links = [], valid_from, supersedes }) {
     if (!KINDS.includes(kind)) throw new Error(`kind 必须是 ${KINDS.join('/')}`);
     if (!title || !String(title).trim()) throw new Error('title 不能为空');
     if (!body || !String(body).trim()) throw new Error('body 不能为空');
@@ -248,23 +305,35 @@ export class MemoryStore {
     if (!source || !source.agent) throw new Error('source.agent 必填：没有出处的记忆不可信');
     assertNoSecrets(`${title}\n${body}`);
 
-    const norm = String(body).replace(/\s+/g, ' ').trim();
-    const hash = sha256(norm);
-    const dup = this.db.prepare('SELECT id FROM notes WHERE content_hash = ? AND tombstoned = 0').get(hash);
-    if (dup) return { id: dup.id, duplicate: true };
+    const norm = normalizeBody(body);
+    for (const c of this.db.prepare('SELECT id, path, hash FROM notes WHERE tombstoned = 0').all()) {
+      const { body: existing } = parseFrontmatter(fs.readFileSync(c.path, 'utf8'));
+      if (normalizeBody(existing) === norm) {
+        return { id: c.id, path: c.path, hash: c.hash, duplicate: true };
+      }
+    }
 
     const now = new Date().toISOString();
     const id = ulid();
+    const prev_hash = this.#meta('chain_head', '');
+    const anchorList = (anchors && anchors.length ? anchors : deriveAnchors(title, tags)).slice(0, 3);
+    const hash = noteHash({ prev_hash, id, created: now, agent: source.agent, body });
     const dir = path.join(this.memDir, kind, now.slice(0, 7));
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, `${slugify(title)}-${id.slice(-6)}.md`);
     const meta = {
-      id, kind, title, created: now, updated: now, tags,
-      confidence, source, links, schema: SCHEMA_VERSION,
+      id, kind, title, created: now, updated: now,
+      valid_from: valid_from || now.slice(0, 10), tags, anchors: anchorList,
+      confidence, source, links, prev_hash, hash, schema: SCHEMA_VERSION,
+      ...(supersedes ? { supersedes } : {}),
     };
     writeAtomic(file, serialize({ meta, body }));
-    this.#index(id, file, meta, body);
-    return { id, path: file, duplicate: false };
+    this.db.exec('BEGIN IMMEDIATE');
+    this.#indexNote({ id, file, meta, body, hash, prev_hash });
+    this.#setMeta('chain_head', hash);
+    this.#setMeta('chain_len', Number(this.#meta('chain_len', 0)) + 1);
+    this.db.exec('COMMIT');
+    return { id, path: file, hash, prev_hash, duplicate: false };
   }
 
   get(idOrPath) {
@@ -275,116 +344,236 @@ export class MemoryStore {
     }
     if (!row) return null;
     const raw = fs.readFileSync(row.path, 'utf8');
-    return { ...row, raw, ...parseFrontmatter(raw) };
+    const parsed = parseFrontmatter(raw);
+    const next = this.db.prepare('SELECT id FROM notes WHERE prev_hash = ?').get(row.hash);
+    return {
+      ...row, raw, ...parsed,
+      audit: {
+        hash: row.hash, prev_hash: row.prev_hash,
+        next_id: next?.id || null, legacy: !row.hash,
+      },
+    };
   }
 
   search(query, { kinds = [], tags = [], since = null, limit = 10 } = {}) {
     const q = String(query || '').trim();
     if (!q) return [];
-    const where = ['n.tombstoned = 0'];
-    const params = [];
-    if (kinds.length) { where.push(`n.kind IN (${kinds.map(() => '?').join(',')})`); params.push(...kinds); }
-    if (since) { where.push('n.updated >= ?'); params.push(since); }
-
-    let rows;
+    const docLimit = Math.max(limit * 5, 40);
+    let hits = [];
     if (q.length >= 3) {
-      const match = `"${q.replace(/"/g, '""')}"`;
-      rows = this.db.prepare(
-        `SELECT n.id, n.title, n.kind, n.confidence, n.updated, n.path,
-                snippet(notes_fts, 2, '[', ']', '…', 16) AS excerpt,
-                bm25(notes_fts) AS score
-         FROM notes_fts JOIN notes n ON n.id = notes_fts.id
-         WHERE notes_fts MATCH ? AND ${where.join(' AND ')}
-         ORDER BY score LIMIT ?`,
-      ).all(match, ...params, limit);
+      hits = this.db.prepare(
+        `SELECT doc_id, ord, text, bm25(obs_fts) AS score
+         FROM obs_fts WHERE obs_fts MATCH ? ORDER BY score LIMIT ?`,
+      ).all(`"${q.replace(/"/g, '""')}"`, docLimit);
     } else {
-      rows = this.db.prepare(
-        `SELECT n.id, n.title, n.kind, n.confidence, n.updated, n.path,
-                substr(n.title, 1, 80) AS excerpt, 0 AS score
-         FROM notes n WHERE (n.title LIKE ? OR n.path LIKE ?) AND ${where.join(' AND ')}
-         LIMIT ?`,
-      ).all(`%${q}%`, `%${q}%`, ...params, limit);
+      // trigram 至少要 3 字；中文两字词（项目/部署/回滚）走观察表 LIKE 回退
+      hits = this.db.prepare(
+        `SELECT o.doc_id, o.ord, o.text, 0 AS score
+         FROM observations o JOIN notes n ON n.id = o.doc_id
+         WHERE n.tombstoned = 0 AND (n.status IS NULL OR n.status = 'active') AND o.text LIKE ? LIMIT ?`,
+      ).all(`%${q}%`, docLimit);
     }
+
+    const byDoc = new Map();
+    for (const h of hits) {
+      const n = this.db.prepare('SELECT * FROM notes WHERE id = ?').get(h.doc_id);
+      if (!n || n.tombstoned || n.status === 'superseded') continue;
+      if (kinds.length && !kinds.includes(n.kind)) continue;
+      if (since && n.updated < since) continue;
+      const arr = byDoc.get(h.doc_id) || { note: n, hits: [] };
+      if (arr.hits.length < 3) arr.hits.push({ ord: h.ord, text: h.text, score: h.score });
+      byDoc.set(h.doc_id, arr);
+    }
+
+    let results = [...byDoc.values()]
+      .sort((a, b) => a.hits[0].score - b.hits[0].score)
+      .slice(0, limit)
+      .map(({ note, hits: hs }) => ({
+        id: note.id, title: note.title, kind: note.kind, confidence: note.confidence,
+        updated: note.updated, anchors: (note.anchors || '').split(' ').filter(Boolean),
+        hits: hs, excerpt: hs[0]?.text?.slice(0, 160) || '',
+      }));
+
+    if (!results.length) {
+      // 短词或未命中：标题回退
+      results = this.db.prepare(
+        `SELECT id, title, kind, confidence, updated, anchors FROM notes
+         WHERE tombstoned = 0 AND (status IS NULL OR status = 'active') AND title LIKE ? LIMIT ?`,
+      ).all(`%${q}%`, limit).map((n) => ({
+        id: n.id, title: n.title, kind: n.kind, confidence: n.confidence,
+        updated: n.updated, anchors: (n.anchors || '').split(' ').filter(Boolean),
+        hits: [], excerpt: n.title,
+      }));
+    }
+
     if (tags.length) {
-      const keep = rows.filter((r) => {
-        const raw = fs.readFileSync(r.path, 'utf8');
-        const { meta } = parseFrontmatter(raw);
+      results = results.filter((r) => {
+        const { meta } = parseFrontmatter(this.db.prepare('SELECT path FROM notes WHERE id = ?').get(r.id).path
+          ? fs.readFileSync(this.db.prepare('SELECT path FROM notes WHERE id = ?').get(r.id).path, 'utf8')
+          : '');
         return tags.every((t) => (meta.tags || []).includes(t));
       });
-      rows = keep;
     }
-    return rows;
+    return results;
   }
 
   recent({ limit = 10, since = null, kinds = [] } = {}) {
-    const where = ['tombstoned = 0'];
+    const where = ["tombstoned = 0 AND (status IS NULL OR status = 'active')"];
     const params = [];
     if (since) { where.push('updated >= ?'); params.push(since); }
     if (kinds.length) { where.push(`kind IN (${kinds.map(() => '?').join(',')})`); params.push(...kinds); }
     return this.db.prepare(
-      `SELECT id, title, kind, confidence, updated, path FROM notes
+      `SELECT id, title, kind, confidence, updated, anchors FROM notes
        WHERE ${where.join(' AND ')} ORDER BY updated DESC LIMIT ?`,
-    ).all(...params, limit);
+    ).all(...params, limit).map((n) => ({ ...n, anchors: (n.anchors || '').split(' ').filter(Boolean) }));
   }
 
+  /** 修订 = 旧条目标记 superseded + 追加一条新记忆（保持链式追加，不破坏审计） */
   revise(id, body, reason = '') {
     const cur = this.get(id);
     if (!cur) throw new Error(`找不到记忆 ${id}`);
     assertNoSecrets(body);
+
     const revDir = path.join(this.home, 'revisions', cur.id);
     fs.mkdirSync(revDir, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     fs.copyFileSync(cur.path, path.join(revDir, `${stamp}.md`));
 
-    const now = new Date().toISOString();
-    const meta = { ...cur.meta, updated: now, revision_of: cur.id };
-    delete meta.schema;
-    if (reason) meta.source = { ...(meta.source || {}), revision_reason: reason };
-    writeAtomic(cur.path, serialize({ meta, body }));
-    this.#index(cur.id, cur.path, meta, body);
-    return { id: cur.id, revision: stamp, path: cur.path };
+    // 旧条目：标记被取代，内容不动（哈希不变）
+    const oldMeta = {
+      ...cur.meta,
+      status: 'superseded',
+      valid_to: new Date().toISOString().slice(0, 10),
+      updated: new Date().toISOString(),
+    };
+    if (reason) oldMeta.source = { ...(oldMeta.source || {}), revision_reason: reason };
+    writeAtomic(cur.path, serialize({ meta: oldMeta, body: cur.body }));
+    this.db.exec('BEGIN IMMEDIATE');
+    this.#indexNote({ id: cur.id, file: cur.path, meta: oldMeta, body: cur.body, hash: cur.hash, prev_hash: cur.prev_hash });
+    this.db.exec('COMMIT');
+
+    const created = this.writeNote({
+      kind: cur.meta.kind,
+      title: cur.meta.title,
+      body,
+      tags: cur.meta.tags || [],
+      anchors: cur.meta.anchors || [],
+      confidence: cur.meta.confidence,
+      source: { ...(cur.meta.source || {}), revision_of: cur.id },
+      links: cur.meta.links || [],
+      supersedes: cur.id,
+    });
+    return { id: created.id, supersedes: cur.id, hash: created.hash, revision: stamp };
   }
 
   forget(id, reason = '') {
     const cur = this.get(id);
     if (!cur) throw new Error(`找不到记忆 ${id}`);
-    const meta = { ...cur.meta, status: 'tombstoned' };
+    const meta = { ...cur.meta, status: 'tombstoned', valid_to: cur.meta.valid_to || new Date().toISOString().slice(0, 10) };
     if (reason) meta.source = { ...(meta.source || {}), forget_reason: reason };
     writeAtomic(cur.path, serialize({ meta, body: cur.body }));
     this.db.prepare('UPDATE notes SET tombstoned = 1 WHERE id = ?').run(id);
-    this.db.prepare('DELETE FROM notes_fts WHERE id = ?').run(id);
+    this.db.prepare('DELETE FROM obs_fts WHERE doc_id = ?').run(id);
+    this.db.prepare('DELETE FROM observations WHERE doc_id = ?').run(id);
     return { id, tombstoned: true };
   }
 
   rebuild() {
-    this.db.exec('DELETE FROM notes; DELETE FROM notes_fts; DELETE FROM links;');
+    this.db.exec('DELETE FROM notes; DELETE FROM obs_fts; DELETE FROM observations; DELETE FROM links; DELETE FROM meta;');
     let count = 0;
+    const files = [];
     const walk = (dir) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, entry.name);
         if (entry.isDirectory()) { walk(p); continue; }
-        if (!entry.name.endsWith('.md')) continue;
-        const raw = fs.readFileSync(p, 'utf8');
-        const { meta, body } = parseFrontmatter(raw);
-        if (!meta.id) continue;
-        this.#index(meta.id, p, meta, body);
-        count++;
+        if (entry.name.endsWith('.md')) files.push(p);
       }
     };
     walk(this.memDir);
+
+    for (const file of files) {
+      const raw = fs.readFileSync(file, 'utf8');
+      const { meta, body } = parseFrontmatter(raw);
+      if (!meta.id) continue;
+      this.#indexNote({
+        id: meta.id, file, meta, body,
+        hash: meta.hash || null, prev_hash: meta.prev_hash || null,
+      });
+      count++;
+    }
+
+    // 恢复链头：找出没有任何笔记以它的 hash 作为 prev_hash 的那条
+    const rows = this.db.prepare('SELECT hash, prev_hash FROM notes WHERE hash IS NOT NULL').all();
+    const referenced = new Set(rows.map((r) => r.prev_hash).filter(Boolean));
+    const heads = rows.filter((r) => !referenced.has(r.hash));
+    if (heads.length === 1) this.#setMeta('chain_head', heads[0].hash);
+    this.#setMeta('chain_len', rows.length);
     return count;
   }
 
-  stats() {
-    const total = this.db.prepare('SELECT COUNT(*) c FROM notes WHERE tombstoned = 0').get().c;
-    const tomb = this.db.prepare('SELECT COUNT(*) c FROM notes WHERE tombstoned = 1').get().c;
-    const byKind = this.db.prepare('SELECT kind, COUNT(*) c FROM notes WHERE tombstoned = 0 GROUP BY kind ORDER BY c DESC').all();
-    const byAgent = this.db.prepare('SELECT source_agent a, COUNT(*) c FROM notes WHERE tombstoned = 0 GROUP BY a ORDER BY c DESC').all();
-    const byConf = this.db.prepare('SELECT confidence, COUNT(*) c FROM notes WHERE tombstoned = 0 GROUP BY confidence').all();
-    return { total, tombstoned: tomb, byKind, byAgent, byConfidence: byConf, home: this.home };
+  /** 校验哈希链：每条笔记的 hash 必须可由字段复算，且 prev_hash 必须存在于链中 */
+  verify() {
+    const rows = this.db.prepare('SELECT * FROM notes WHERE hash IS NOT NULL ORDER BY created').all();
+    const byHash = new Map(rows.map((r) => [r.hash, r]));
+    const problems = [];
+    let checked = 0;
+    for (const r of rows) {
+      const raw = fs.readFileSync(r.path, 'utf8');
+      const { meta, body } = parseFrontmatter(raw);
+      const expect = noteHash({
+        prev_hash: meta.prev_hash || '', id: meta.id, created: meta.created,
+        agent: meta.source?.agent, body,
+      });
+      checked++;
+      if (expect !== meta.hash) problems.push({ level: 'error', code: 'hash-mismatch', id: r.id, path: r.path });
+      if (meta.prev_hash && !byHash.has(meta.prev_hash)) {
+        problems.push({ level: 'error', code: 'missing-predecessor', id: r.id });
+      }
+    }
+    const legacy = this.db.prepare('SELECT COUNT(*) c FROM notes WHERE hash IS NULL').get().c;
+    return { ok: problems.length === 0, checked, legacy, problems };
   }
 
-  /** 体检：frontmatter 合法性、重复、断链、索引漂移。只读。 */
+  /** 把 v1 笔记升级为 v2：补 valid_from / anchors / prev_hash / hash */
+  migrate({ apply = false } = {}) {
+    const files = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, entry.name);
+        if (entry.isDirectory()) { walk(p); continue; }
+        if (entry.name.endsWith('.md')) files.push(p);
+      }
+    };
+    walk(this.memDir);
+
+    const pending = files
+      .map((file) => ({ file, raw: fs.readFileSync(file, 'utf8') }))
+      .map(({ file, raw }) => ({ file, raw, ...parseFrontmatter(raw) }))
+      .filter(({ meta }) => !meta.hash || Number(meta.schema || 1) < SCHEMA_VERSION)
+      .sort((a, b) => String(a.meta.created).localeCompare(String(b.meta.created)));
+
+    if (!apply) return { apply: false, pending: pending.length };
+    if (!pending.length) return { apply: true, migrated: 0 };
+
+    const dir = path.join(this.home, 'backups', `pre-v2-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+    fs.mkdirSync(dir, { recursive: true });
+
+    let prev = this.#meta('chain_head', '');
+    for (const item of pending) {
+      fs.copyFileSync(item.file, path.join(dir, path.basename(item.file)));
+      const meta = { ...item.meta };
+      meta.valid_from = meta.valid_from || String(meta.created).slice(0, 10);
+      meta.anchors = meta.anchors?.length ? meta.anchors : deriveAnchors(meta.title, meta.tags || []);
+      meta.prev_hash = prev;
+      meta.hash = noteHash({ prev_hash: prev, id: meta.id, created: meta.created, agent: meta.source?.agent, body: item.body });
+      meta.schema = SCHEMA_VERSION;
+      writeAtomic(item.file, serialize({ meta, body: item.body }));
+      prev = meta.hash;
+    }
+    this.rebuild();
+    return { apply: true, migrated: pending.length, backup: dir };
+  }
+
   doctor() {
     const problems = [];
     const files = [];
@@ -397,7 +586,7 @@ export class MemoryStore {
     };
     walk(this.memDir);
 
-    const seenHash = new Map();
+    const seenBody = new Map();
     const ids = new Set();
     for (const file of files) {
       const raw = fs.readFileSync(file, 'utf8');
@@ -406,24 +595,23 @@ export class MemoryStore {
       if (!meta.id) problems.push({ level: 'error', code: 'missing-id', file: rel });
       if (!KINDS.includes(meta.kind)) problems.push({ level: 'error', code: 'bad-kind', file: rel, value: meta.kind });
       if (!meta.title) problems.push({ level: 'error', code: 'missing-title', file: rel });
-      if (!CONFIDENCE.includes(meta.confidence)) problems.push({ level: 'warn', code: 'bad-confidence', file: rel, value: meta.confidence });
+      if (!CONFIDENCE.includes(meta.confidence)) problems.push({ level: 'warn', code: 'bad-confidence', file: rel });
       if (!meta.source?.agent) problems.push({ level: 'error', code: 'missing-source', file: rel });
+      if (!meta.hash) problems.push({ level: 'warn', code: 'legacy-no-hash', file: rel });
       if (meta.id) ids.add(meta.id);
-      const h = sha256(String(body).replace(/\s+/g, ' ').trim());
-      if (seenHash.has(h)) problems.push({ level: 'warn', code: 'duplicate', file: rel, other: seenHash.get(h) });
-      else seenHash.set(h, rel);
+      const h = sha256(normalizeBody(body));
+      if (seenBody.has(h)) problems.push({ level: 'warn', code: 'duplicate', file: rel, other: seenBody.get(h) });
+      else seenBody.set(h, rel);
     }
 
     for (const file of files) {
       const { meta } = parseFrontmatter(fs.readFileSync(file, 'utf8'));
       for (const lk of meta.links || []) {
-        if (!ids.has(lk.target)) {
-          problems.push({ level: 'warn', code: 'broken-link', file: path.relative(this.home, file), target: lk.target });
-        }
+        if (!ids.has(lk.target)) problems.push({ level: 'warn', code: 'broken-link', file: path.relative(this.home, file), target: lk.target });
       }
     }
 
-    const rows = this.db.prepare('SELECT id, path, content_hash FROM notes').all();
+    const rows = this.db.prepare('SELECT id, path FROM notes').all();
     const indexed = new Set(rows.map((r) => r.path));
     for (const file of files) {
       if (!indexed.has(file)) problems.push({ level: 'error', code: 'not-indexed', file: path.relative(this.home, file) });
@@ -436,7 +624,6 @@ export class MemoryStore {
     return { ok: errors === 0, files: files.length, indexed: rows.length, problems };
   }
 
-  /** 清理：墓碑与旧修订。默认 dry-run，需显式 dryRun:false 才删除。 */
   gc({ olderThanDays = 30, dryRun = true } = {}) {
     const cutoff = new Date(Date.now() - olderThanDays * 86400000).toISOString();
     const tombs = this.db.prepare('SELECT id, path FROM notes WHERE tombstoned = 1 AND updated < ?').all(cutoff);
@@ -468,5 +655,14 @@ export class MemoryStore {
       }
     }
     return { dryRun, olderThanDays, tombstones: tombs.length, revisions: revs.length, freedBytes: freed };
+  }
+
+  stats() {
+    const total = this.db.prepare('SELECT COUNT(*) c FROM notes WHERE tombstoned = 0').get().c;
+    const tomb = this.db.prepare('SELECT COUNT(*) c FROM notes WHERE tombstoned = 1').get().c;
+    const byKind = this.db.prepare('SELECT kind, COUNT(*) c FROM notes WHERE tombstoned = 0 GROUP BY kind ORDER BY c DESC').all();
+    const byAgent = this.db.prepare('SELECT source_agent a, COUNT(*) c FROM notes WHERE tombstoned = 0 GROUP BY a ORDER BY c DESC').all();
+    const byConf = this.db.prepare('SELECT confidence, COUNT(*) c FROM notes WHERE tombstoned = 0 GROUP BY confidence').all();
+    return { total, tombstoned: tomb, byKind, byAgent, byConfidence: byConf, home: this.home };
   }
 }

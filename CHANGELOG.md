@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.0 — 2026-11-23
+
+### 新增
+- **Schema v2**：`valid_from` / `valid_to`（双时态语义）、`anchors`（检索锚词）、`prev_hash` / `hash`
+- **哈希审计链**：每次写入链接上一条；`memhub verify` 可检出任何历史篡改
+- **观察级检索**：`## 观察` 下的每条 bullet 独立建索引，返回命中的具体观察
+- **修订语义改为追加**：旧条目标记 `superseded` + `valid_to`，新条目写入链尾（不再原地覆盖）
+- `memhub migrate`：v1 → v2 升级，自动备份到 `backups/pre-v2-*`
+- MCP 新 resource `memory://audit`
+
+### 变更
+- 2 字中文查询回退到观察表 LIKE（trigram 最少 3 字）
+- 搜索默认排除 `superseded` 与墓碑
+- 测试从 15 项增至 18 项
+
 ## v0.2.0 — 2026-11-23
 
 ### 新增

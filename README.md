@@ -62,11 +62,19 @@ node src/cli.mjs write \
 # 3. 中文检索（FTS5 trigram，≥3 字走全文索引）
 node src/cli.mjs search "智能体" --limit 5
 
-# 4. 体检 / 清理 / 重建
+# 4. 体检 / 审计 / 清理
 node src/cli.mjs doctor                    # frontmatter、重复、断链、索引漂移
+node src/cli.mjs verify                    # 校验哈希审计链
 node src/cli.mjs gc                        # 默认 dry-run，看清了再加 --yes
 node src/cli.mjs stats
 node src/cli.mjs rebuild
+```
+
+从 v1 升级（会自动备份到 `~/Memory/backups/pre-v2-*`）：
+
+```bash
+node src/cli.mjs migrate          # 先看有多少条待迁移
+node src/cli.mjs migrate --yes    # 真正执行
 ```
 
 ## 接入任意 MCP 客户端
@@ -115,6 +123,23 @@ node src/cli.mjs rebuild
 - 绝不写入密码或密钥
 ```
 
+## 审计链
+
+每次写入都会链接上一条：
+
+```
+hash_n = sha256(prev_hash + id + created + source.agent + normalized(body))
+```
+
+- 任何历史改写都会被 `memhub verify` 发现（`hash-mismatch`）
+- 修订不覆盖原条目：旧条目标记 `superseded` 并写 `valid_to`，新条目追加到链尾
+- 链只追加，因此可以回答「当时记的是什么、什么时候被谁取代」
+
+```bash
+$ memhub verify
+{ "ok": true, "checked": 42, "legacy": 0, "problems": [] }
+```
+
 ## 记忆模型
 
 五类记忆，强制出处与置信度：
@@ -127,7 +152,9 @@ node src/cli.mjs rebuild
 | `decisions` | 决策 | 结论 + 理由 + 备选 + 影响 |
 | `episodes` | 事件结论 | 某次故障的根因 |
 
-每条记忆带 `source.agent`、`confidence`、`created/updated`、可选 `links`。
+每条记忆带 `source.agent`、`confidence`、`created/updated`、`valid_from/valid_to`、`anchors`、`prev_hash/hash`、可选 `links`。
+
+正文中的 `## 观察` 段落会被拆成独立条目建索引，检索时返回**命中的具体观察**，而不是整篇摘要。`anchors` 是 1–3 个检索锚词，用于补中文 trigram 对同义改写不敏感的短板。
 **没有出处的记忆不可信**——这是把它和其他记忆库区分开的设计约束。
 
 ## 工具清单
@@ -147,14 +174,14 @@ Resources：`memory://recent`、`memory://index`。
 
 ```bash
 node test/smoke.mjs
-# ✓ 15 项冒烟测试全部通过
+# ✓ 18 项冒烟测试全部通过
 ```
 
 CI 在 Node 22 / 24 / 26 三个版本上跑同一套测试。
 
 ## 项目状态
 
-见 [ROADMAP.md](ROADMAP.md)。当前 **v0.2**：存储、索引、CLI、MCP server、doctor/gc、示例配置、CI 可用。
+见 [ROADMAP.md](ROADMAP.md)。当前 **v0.3**：Schema v2、哈希审计链、观察级检索、doctor/verify/migrate/gc、示例配置、CI 可用。
 
 - License: MIT
 - 零运行时依赖
