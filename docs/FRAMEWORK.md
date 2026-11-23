@@ -73,7 +73,31 @@ HTTP 只监听 `127.0.0.1`，不开局域网端口——这是对之前 8001/180
 
 新增一个智能体 = 往 `ADAPTERS` 数组加一项，不需要动存储、不需要动工具、不需要动其他接口。
 
-## 五、当前支持
+## 五、DeepSeek Harness 接入（本机已配置）
+
+在 `~/.dsh/profiles/desktop/cordis.patch.yml` 末尾追加：
+
+```yaml
+- id: memory-hub
+  name: "@deepseek-ai/dsh-mcp-client"
+  config:
+    serverName: memory
+    transport: stdio
+    command: node
+    args: ["<repo>/src/mcp.mjs"]
+    env:
+      MEMORY_HOME: "/Users/<you>/Memory"
+    failOnStartupError: false
+```
+
+要点：
+
+- **新增插件行需要重启应用**才生效（运行时不会热加载新行）
+- 重启后工具名为 `mcp__memory__mem_search` 等
+- 同时在工作区根放 `AGENTS.md` 写记忆约定（DSH 的 agent-instructions 由 preset 提供，会自动加载）
+- 备份：`~/.dsh/profiles/desktop/cordis.patch.yml.bak-*`
+
+## 六、当前支持
 
 | id | 智能体 | 协议 | 本机检测 |
 |---|---|---|---|
@@ -91,7 +115,7 @@ memhub adapters detect     # 只看本机已检测到的
 memhub adapters show dsh   # 打印可直接粘贴的配置
 ```
 
-## 六、接入一个智能体的标准步骤
+## 七、接入一个智能体的标准步骤
 
 1. `memhub adapters show <id>` 拿到片段
 2. 粘贴到该智能体的配置文件
@@ -100,7 +124,7 @@ memhub adapters show dsh   # 打印可直接粘贴的配置
 
 第 3 步最容易被跳过，但**没有它，智能体不会主动读写记忆**。
 
-## 七、HTTP 接口
+## 八、HTTP 接口
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -112,7 +136,7 @@ memhub adapters show dsh   # 打印可直接粘贴的配置
 | POST | `/v1/write` | 写入 |
 | POST | `/v1/tools/:name` | 直接调用工具（与 MCP 同名同参） |
 
-## 八、为什么不做成单一大接口
+## 九、为什么不做成单一大接口
 
 三种场景的约束完全不同：
 
@@ -122,7 +146,7 @@ memhub adapters show dsh   # 打印可直接粘贴的配置
 
 硬塞进一个接口会同时得罪三种调用方。**接口分裂、语义统一**（同一个 `mem_write`）是唯一合理的解法。
 
-## 九、下一步
+## 十、下一步
 
 0. 把 `DIGEST.md` 写进各智能体的指令文件（读取路径的落地）
 1. 逐个接通本机已检测到的智能体（dsh → claude-code → codex → import）
