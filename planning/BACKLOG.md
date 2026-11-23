@@ -16,16 +16,16 @@
 
 | ID | 任务 | 状态 | 优先级 | 估时 | 验收 |
 |---|---|---|---|---|---|
-| T-001 | Codex 接入记忆服务 | todo | P1 | 1h | codex mcp list 显示 Connected；agent 能调用 mem_search |
+| T-001 | Codex 接入记忆服务 ⛔Codex CLI 未安装（codex 命令不存在，app 已删除） | blocked | P1 | 1h | codex mcp list 显示 Connected；agent 能调用 mem_search |
 | T-002 | Claude Code 端到端验证 ⛔Claude Code 未登录（401） | blocked | P1 | 0.5h | claude -p 查询能返回 DSH 写入的记忆 |
 
 ## E4 记忆治理 — 长期使用后检索仍准、摘要仍有用
 
 | ID | 任务 | 状态 | 优先级 | 估时 | 验收 |
 |---|---|---|---|---|---|
-| T-004 | 治理命令：review / archive / health | todo | P1 | 4h | 能列出重复/过期/冲突；archive 可回滚；health 输出指标 |
-| T-005 | 访问计数与衰减评分 | todo | P1 | 2h | mem_get/mem_search 更新 uses；score 可计算并用于排序 |
-| T-006 | 86 条导入记忆抽查（≥20 条） | todo | P1 | 1h | 抽查准确率 ≥90%，错误条目修订或 forget |
+| T-004 | 治理命令：review / archive / health | done | P1 | 4h | 能列出重复/过期/冲突；archive 可回滚；health 输出指标 |
+| T-005 | 访问计数与衰减评分 | done | P1 | 2h | mem_get/mem_search 更新 uses；score 可计算并用于排序 |
+| T-006 | 86 条导入记忆抽查（≥20 条） | done | P1 | 1h | 抽查准确率 ≥90%，错误条目修订或 forget |
 | T-007 | 手机号等敏感信息脱敏 | todo | P2 | 0.5h | 记忆库中无完整手机号；提供脱敏命令 |
 
 ## E5 运维 — 定时任务、备份、可观测、可回滚

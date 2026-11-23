@@ -2,84 +2,187 @@
   "version": 1,
   "updated": "2026-11-23",
   "epics": [
-    { "id": "E1", "name": "核心存储", "goal": "Markdown 事实源、索引可重建、审计链完整" },
-    { "id": "E2", "name": "接口层", "goal": "MCP / HTTP / CLI / 文件导入四条通道稳定" },
-    { "id": "E3", "name": "智能体接入", "goal": "每个智能体一个仓库，端到端可读可写" },
-    { "id": "E4", "name": "记忆治理", "goal": "长期使用后检索仍准、摘要仍有用" },
-    { "id": "E5", "name": "运维", "goal": "定时任务、备份、可观测、可回滚" },
-    { "id": "E6", "name": "发布", "goal": "文档、License、CI、npm/GitHub 可发布" }
+    {
+      "id": "E1",
+      "name": "核心存储",
+      "goal": "Markdown 事实源、索引可重建、审计链完整"
+    },
+    {
+      "id": "E2",
+      "name": "接口层",
+      "goal": "MCP / HTTP / CLI / 文件导入四条通道稳定"
+    },
+    {
+      "id": "E3",
+      "name": "智能体接入",
+      "goal": "每个智能体一个仓库，端到端可读可写"
+    },
+    {
+      "id": "E4",
+      "name": "记忆治理",
+      "goal": "长期使用后检索仍准、摘要仍有用"
+    },
+    {
+      "id": "E5",
+      "name": "运维",
+      "goal": "定时任务、备份、可观测、可回滚"
+    },
+    {
+      "id": "E6",
+      "name": "发布",
+      "goal": "文档、License、CI、npm/GitHub 可发布"
+    }
   ],
   "tasks": [
     {
-      "id": "T-001", "epic": "E3", "title": "Codex 接入记忆服务",
-      "status": "todo", "priority": "P1", "estimate": 1, "owner": "lead", "deps": [],
+      "id": "T-001",
+      "epic": "E3",
+      "title": "Codex 接入记忆服务",
+      "status": "blocked",
+      "priority": "P1",
+      "estimate": 1,
+      "owner": "lead",
+      "deps": [],
       "accept": "codex mcp list 显示 Connected；agent 能调用 mem_search",
-      "updated": "2026-11-23"
+      "updated": "2026-11-23",
+      "blockedBy": "Codex CLI 未安装（codex 命令不存在，app 已删除）"
     },
     {
-      "id": "T-002", "epic": "E3", "title": "Claude Code 端到端验证",
-      "status": "blocked", "priority": "P1", "estimate": 0.5, "owner": "user", "deps": [],
+      "id": "T-002",
+      "epic": "E3",
+      "title": "Claude Code 端到端验证",
+      "status": "blocked",
+      "priority": "P1",
+      "estimate": 0.5,
+      "owner": "user",
+      "deps": [],
       "accept": "claude -p 查询能返回 DSH 写入的记忆",
       "blockedBy": "Claude Code 未登录（401）",
       "updated": "2026-11-23"
     },
     {
-      "id": "T-003", "epic": "E2", "title": "会话启动自动注入最近记忆",
-      "status": "todo", "priority": "P2", "estimate": 3, "owner": "lead", "deps": [],
+      "id": "T-003",
+      "epic": "E2",
+      "title": "会话启动自动注入最近记忆",
+      "status": "todo",
+      "priority": "P2",
+      "estimate": 3,
+      "owner": "lead",
+      "deps": [],
       "accept": "新会话上下文自动含 DIGEST 摘要，无需手动读",
       "updated": "2026-11-23"
     },
     {
-      "id": "T-004", "epic": "E4", "title": "治理命令：review / archive / health",
-      "status": "todo", "priority": "P1", "estimate": 4, "owner": "lead", "deps": [],
+      "id": "T-004",
+      "epic": "E4",
+      "title": "治理命令：review / archive / health",
+      "status": "done",
+      "priority": "P1",
+      "estimate": 4,
+      "owner": "lead",
+      "deps": [],
       "accept": "能列出重复/过期/冲突；archive 可回滚；health 输出指标",
       "updated": "2026-11-23"
     },
     {
-      "id": "T-005", "epic": "E4", "title": "访问计数与衰减评分",
-      "status": "todo", "priority": "P1", "estimate": 2, "owner": "lead", "deps": ["T-004"],
+      "id": "T-005",
+      "epic": "E4",
+      "title": "访问计数与衰减评分",
+      "status": "done",
+      "priority": "P1",
+      "estimate": 2,
+      "owner": "lead",
+      "deps": [
+        "T-004"
+      ],
       "accept": "mem_get/mem_search 更新 uses；score 可计算并用于排序",
       "updated": "2026-11-23"
     },
     {
-      "id": "T-006", "epic": "E4", "title": "86 条导入记忆抽查（≥20 条）",
-      "status": "todo", "priority": "P1", "estimate": 1, "owner": "lead", "deps": [],
+      "id": "T-006",
+      "epic": "E4",
+      "title": "86 条导入记忆抽查（≥20 条）",
+      "status": "done",
+      "priority": "P1",
+      "estimate": 1,
+      "owner": "lead",
+      "deps": [],
       "accept": "抽查准确率 ≥90%，错误条目修订或 forget",
       "updated": "2026-11-23"
     },
     {
-      "id": "T-007", "epic": "E4", "title": "手机号等敏感信息脱敏",
-      "status": "todo", "priority": "P2", "estimate": 0.5, "owner": "lead", "deps": [],
+      "id": "T-007",
+      "epic": "E4",
+      "title": "手机号等敏感信息脱敏",
+      "status": "todo",
+      "priority": "P2",
+      "estimate": 0.5,
+      "owner": "lead",
+      "deps": [],
       "accept": "记忆库中无完整手机号；提供脱敏命令",
       "updated": "2026-11-23"
     },
     {
-      "id": "T-008", "epic": "E5", "title": "每日 git 提交与备份",
-      "status": "todo", "priority": "P2", "estimate": 1, "owner": "lead", "deps": [],
+      "id": "T-008",
+      "epic": "E5",
+      "title": "每日 git 提交与备份",
+      "status": "todo",
+      "priority": "P2",
+      "estimate": 1,
+      "owner": "lead",
+      "deps": [],
       "accept": "launchd 每日提交各 agent 仓库；备份可通过脚本恢复",
       "updated": "2026-11-23"
     },
     {
-      "id": "T-009", "epic": "E5", "title": "并发写与 10k 条性能基准",
-      "status": "todo", "priority": "P3", "estimate": 2, "owner": "lead", "deps": [],
+      "id": "T-009",
+      "epic": "E5",
+      "title": "并发写与 10k 条性能基准",
+      "status": "todo",
+      "priority": "P3",
+      "estimate": 2,
+      "owner": "lead",
+      "deps": [],
       "accept": "两 agent 并发写 100 条不丢；10k 条检索 <500ms",
       "updated": "2026-11-23"
     },
     {
-      "id": "T-010", "epic": "E6", "title": "发布到 GitHub 并打 tag",
-      "status": "todo", "priority": "P2", "estimate": 2, "owner": "user", "deps": ["T-011"],
+      "id": "T-010",
+      "epic": "E6",
+      "title": "发布到 GitHub 并打 tag",
+      "status": "todo",
+      "priority": "P2",
+      "estimate": 2,
+      "owner": "user",
+      "deps": [
+        "T-011"
+      ],
       "accept": "仓库公开、README 完整、有 v1.0.0 tag",
       "updated": "2026-11-23"
     },
     {
-      "id": "T-011", "epic": "E6", "title": "英文 README 与安装说明",
-      "status": "todo", "priority": "P3", "estimate": 2, "owner": "lead", "deps": [],
+      "id": "T-011",
+      "epic": "E6",
+      "title": "英文 README 与安装说明",
+      "status": "todo",
+      "priority": "P3",
+      "estimate": 2,
+      "owner": "lead",
+      "deps": [],
       "accept": "英文 README 覆盖安装/接入/工具说明",
       "updated": "2026-11-23"
     },
     {
-      "id": "T-012", "epic": "E1", "title": "OpenClaw 历史导入（25 agent / 4,490 条）",
-      "status": "todo", "priority": "P3", "estimate": 2, "owner": "lead", "deps": ["T-006"],
+      "id": "T-012",
+      "epic": "E1",
+      "title": "OpenClaw 历史导入（25 agent / 4,490 条）",
+      "status": "todo",
+      "priority": "P3",
+      "estimate": 2,
+      "owner": "lead",
+      "deps": [
+        "T-006"
+      ],
       "accept": "导入 20–40 条，与 Hermes 条目不重复",
       "updated": "2026-11-23"
     }

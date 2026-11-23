@@ -8,7 +8,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 export const KINDS = ['facts', 'preferences', 'entities', 'decisions', 'episodes'];
 export const CONFIDENCE = ['high', 'medium', 'low'];
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /** 某个 agent 的仓库根目录 */
 export function agentRoot(home, agent) {
@@ -290,6 +290,9 @@ export class MemoryStore {
         PRIMARY KEY (doc_id, ord)
       );
       CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+      CREATE TABLE IF NOT EXISTS usage (
+        id TEXT PRIMARY KEY, uses INTEGER NOT NULL DEFAULT 0, last_used TEXT
+      );
       CREATE VIRTUAL TABLE IF NOT EXISTS obs_fts USING fts5(
         doc_id UNINDEXED, ord UNINDEXED, text, tokenize = 'trigram'
       );
@@ -468,7 +471,7 @@ export class MemoryStore {
     const byDoc = new Map();
     for (const h of hits) {
       const n = this.db.prepare('SELECT * FROM notes WHERE id = ?').get(h.doc_id);
-      if (!n || n.tombstoned || n.status === 'superseded') continue;
+      if (!n || n.tombstoned || n.status === 'superseded' || n.status === 'archived') continue;
       if (of.params.length && !of.params.includes(n.owner)) continue;
       if (kinds.length && !kinds.includes(n.kind)) continue;
       if (since && n.updated < since) continue;
@@ -834,6 +837,124 @@ export class MemoryStore {
     }
     if (Buffer.byteLength(out) > maxBytes) out = out.slice(0, maxBytes);
     return out;
+  }
+
+  /** 记录一次使用（用于衰减与热度） */
+  touch(ids) {
+    const list = Array.isArray(ids) ? ids : [ids];
+    const now = new Date().toISOString();
+    for (const id of list) {
+      if (!id) continue;
+      this.db.prepare(
+        `INSERT INTO usage (id, uses, last_used) VALUES (?, 1, ?)
+         ON CONFLICT(id) DO UPDATE SET uses = uses + 1, last_used = excluded.last_used`,
+      ).run(id, now);
+    }
+  }
+
+  usageOf(id) {
+    return this.db.prepare('SELECT uses, last_used FROM usage WHERE id = ?').get(id) || { uses: 0, last_used: null };
+  }
+
+  /** 衰减评分：置信度 × 时间衰减 × 使用增益 */
+  score(row) {
+    const w = { high: 1, medium: 0.6, low: 0.3 }[row.confidence] || 0.5;
+    const u = this.usageOf(row.id);
+    const base = u.last_used || row.updated;
+    const days = Math.max(0, (Date.now() - new Date(base).getTime()) / 86400000);
+    return w * Math.exp(-days / 180) * (1 + Math.log1p(u.uses || 0));
+  }
+
+  /** 体检：重复 / 过期 / 孤立，只读 */
+  review({ dupThreshold = 0.8, staleDays = 180, orphanDays = 90 } = {}) {
+    const rows = this.db.prepare(
+      "SELECT id, owner, title, path, updated, review_at, confidence, status FROM notes WHERE tombstoned = 0 AND (status IS NULL OR status = 'active')",
+    ).all();
+    const grams = (s) => { const t = String(s).replace(/\s+/g, ''); const g = new Set(); for (let i = 0; i < t.length - 2; i++) g.add(t.slice(i, i + 3)); return g; };
+    const bodies = rows.map((r) => {
+      const { body } = parseFrontmatter(fs.readFileSync(r.path, 'utf8'));
+      return { ...r, body, g: grams(body) };
+    });
+
+    const duplicates = [];
+    for (let i = 0; i < bodies.length; i++) {
+      for (let j = i + 1; j < bodies.length; j++) {
+        const a = bodies[i].g; const b = bodies[j].g;
+        let inter = 0; for (const x of a) if (b.has(x)) inter++;
+        const jac = inter / (a.size + b.size - inter || 1);
+        if (jac >= dupThreshold) duplicates.push({ a: bodies[i].id, b: bodies[j].id, similarity: Number(jac.toFixed(2)) });
+      }
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const stale = [];
+    const orphans = [];
+    for (const r of bodies) {
+      const u = this.usageOf(r.id);
+      const days = Math.floor((Date.now() - new Date(u.last_used || r.updated).getTime()) / 86400000);
+      if (r.review_at && r.review_at < today) stale.push({ id: r.id, reason: `review_at ${r.review_at} 已过`, days });
+      else if (days >= staleDays) stale.push({ id: r.id, reason: `${days} 天未被使用`, days });
+      const links = this.db.prepare('SELECT COUNT(*) c FROM links WHERE from_id = ?').get(r.id).c;
+      if (!links && days >= orphanDays) orphans.push({ id: r.id, reason: '无关联且长期未用', days });
+    }
+
+    return {
+      total: bodies.length,
+      duplicates: duplicates.slice(0, 20),
+      stale: stale.sort((a, b) => b.days - a.days).slice(0, 20),
+      orphans: orphans.slice(0, 20),
+      counts: { duplicates: duplicates.length, stale: stale.length, orphans: orphans.length },
+    };
+  }
+
+  /** 归档：移出活跃集，文件进 archive/，不删除 */
+  archive(ids, { dryRun = true } = {}) {
+    const list = Array.isArray(ids) ? ids : [ids];
+    const actions = [];
+    for (const id of list) {
+      const row = this.db.prepare('SELECT id, owner, path, title FROM notes WHERE id = ?').get(id);
+      if (!row) { actions.push({ id, skipped: 'not-found' }); continue; }
+      const rel = path.relative(this.home, row.path);
+      const dest = path.join(this.home, 'archive', rel);
+      actions.push({ id, title: row.title, from: rel, to: path.relative(this.home, dest) });
+      if (dryRun) continue;
+
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.renameSync(row.path, dest);
+      const { meta, body } = parseFrontmatter(fs.readFileSync(dest, 'utf8'));
+      const next = { ...meta, status: 'archived', valid_to: meta.valid_to || new Date().toISOString().slice(0, 10) };
+      fs.writeFileSync(dest, serialize({ meta: next, body }));
+      this.db.prepare('UPDATE notes SET status = ?, path = ?, tombstoned = 0 WHERE id = ?').run('archived', dest, id);
+      this.db.prepare('DELETE FROM obs_fts WHERE doc_id = ?').run(id);
+      this.db.prepare('DELETE FROM observations WHERE doc_id = ?').run(id);
+    }
+    return { dryRun, actions };
+  }
+
+  /** 健康指标 */
+  health({ digestBytes = null } = {}) {
+    const rows = this.db.prepare('SELECT id, owner, confidence, status, updated FROM notes WHERE tombstoned = 0').all();
+    const archived = rows.filter((r) => r.status === 'archived').length;
+    const active = rows.filter((r) => r.status !== 'archived' && r.status !== 'superseded');
+    const used = active.filter((r) => this.usageOf(r.id).uses > 0).length;
+    let hot = 0;
+    for (const r of active) if (this.score(r) >= 0.8) hot++;
+    const conf = active.reduce((s, r) => s + ({ high: 1, medium: 0.6, low: 0.3 }[r.confidence] || 0.5), 0) / (active.length || 1);
+    const rv = this.review();
+    return {
+      total: rows.length,
+      active: active.length,
+      hot,
+      warm: active.length - hot,
+      archived,
+      usedRate: Number((used / (active.length || 1)).toFixed(2)),
+      avgConfidence: Number(conf.toFixed(2)),
+      duplicatePairs: rv.counts.duplicates,
+      stale: rv.counts.stale,
+      orphans: rv.counts.orphans,
+      digestBytes,
+      byOwner: active.reduce((m, r) => { m[r.owner] = (m[r.owner] || 0) + 1; return m; }, {}),
+    };
   }
 
   gc({ olderThanDays = 30, dryRun = true } = {}) {

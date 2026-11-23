@@ -111,6 +111,21 @@ try {
       print(project(store, { owners: args.owners ? String(args.owners).split(',') : null }));
       break;
     }
+    case 'review': {
+      print(store.review({ dupThreshold: Number(args.dup || 0.8) }));
+      break;
+    }
+    case 'archive': {
+      const ids = (args.ids || args._.slice(1).join(',')).split(',').map((x) => x.trim()).filter(Boolean);
+      if (!ids.length) { print({ error: '用法：memhub archive <id[,id]> [--yes]' }); process.exitCode = 1; break; }
+      print(store.archive(ids, { dryRun: !(args.yes || args.apply) }));
+      break;
+    }
+    case 'health': {
+      const dg = path.join(store.home, 'DIGEST.md');
+      print(store.health({ digestBytes: fs.existsSync(dg) ? fs.statSync(dg).size : null }));
+      break;
+    }
     case 'dsh': {
       const sub = args._[0] || 'sync';
       if (sub === 'ingest') {
@@ -253,6 +268,9 @@ try {
         + '  memhub dsh sync [--no-embed] [--no-ingest]     # 接管 DSH：摘要嵌入 AGENTS.md + 会话沉淀\n'
         + '  memhub serve [--port 7710]    # 启动本机 HTTP 守护进程\n'
         + '  memhub adapters [list|detect|show <id>]   # 各智能体的接入方式\n'
+        + '  memhub review                 # 治理体检：重复 / 过期 / 孤立\n'
+        + '  memhub archive <id[,id]> [--yes]  # 归档（移出活跃集，不删除）\n'
+        + '  memhub health                 # 健康指标：hot/warm/archived、使用率\n'
         + '  memhub agents [list|register <id>]        # 多仓库：agent 仓库总览/登记\n'
         + '  memhub migrate-multi [--yes]              # 迁移旧 memories/ 到 agents/<id>/\n'
         + '  memhub project                            # 重建 shared/ 只读投影\n'

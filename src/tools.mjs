@@ -78,6 +78,7 @@ export function callTool(store, name, a = {}) {
     case 'mem_get': {
       const n = store.get(a.id);
       if (!n) throw new Error(`未找到 ${a.id}`);
+      store.touch(n.id);
       return {
         id: n.id, path: n.path, meta: n.meta, body: n.body,
         audit: n.audit,

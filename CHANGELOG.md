@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.9.0 — 2026-11-23
+
+### 治理（T-004 / T-005）
+- `memhub review`：检出重复（trigram 相似度）、过期（review_at / 180 天未用）、孤立（无关联且 90 天未用）
+- `memhub archive`：移入 `archive/`，状态置 archived，默认 dry-run；**不删除，可回滚**
+- `memhub health`：hot/warm/archived 分布、使用率、平均置信度、重复与过期计数、摘要体积
+- 使用计数：`mem_get` 记录 `usage(uses, last_used)`；评分 `置信度 × exp(-天/180) × (1+ln(1+uses))`
+- Schema v4（新增 usage 表，独立于索引，重建不丢）
+
+### 质量（T-006）
+- 86 条导入记忆全量校验：证据 session 全部有效、无近似重复、无字段问题
+- 抽样 8 条与原始对话比对：全部有据可查
+- 修正冲突：60 学时目标改为 50（修订留痕）
+
+### 管理
+- `planning/tasks.json` + `scripts/pm.mjs` + 看板生成；`docs/PROJECT-MANAGEMENT.md`
+
 ## v0.8.0 — 2026-11-23
 
 ### 历史蒸馏导入
