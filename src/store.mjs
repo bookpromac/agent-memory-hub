@@ -147,10 +147,10 @@ export function summaryOf(body) {
     const rest = text.slice(m.index + m[0].length);
     const next = /^##\s+/m.exec(rest);
     const block = (next ? rest.slice(0, next.index) : rest).replace(/\s+/g, ' ').trim();
-    if (block) return block.slice(0, 120);
+    if (block) return block.slice(0, 110);
   }
   const first = text.replace(/^#+\s*/gm, '').replace(/\s+/g, ' ').trim();
-  return first.slice(0, 120);
+  return first.slice(0, 110);
 }
 
 export function slugify(title) {
@@ -759,7 +759,7 @@ export class MemoryStore {
    * 生成「常驻读取」摘要：给智能体每次会话必读的几 KB 内容。
    * 只读，不写库；由 CLI 决定是否落盘。
    */
-  digest({ maxBytes = 4096, now = new Date(), owners = null, bare = false } = {}) {
+  digest({ maxBytes = 6144, now = new Date(), owners = null, bare = false } = {}) {
     const scope = owners || this.visibleOwners();
     const ownerSql = scope ? ` AND owner IN (${scope.map(() => '?').join(',')})` : '';
     const rows = this.db.prepare(
@@ -775,7 +775,28 @@ export class MemoryStore {
       return { ...r, summary: summaryOf(body) };
     });
 
-    const by = (k, n) => items.filter((i) => i.kind === k).slice(0, n);
+    const CONF_RANK = { high: 3, medium: 2, low: 1 };
+    const ordered = items.slice().sort((a, b) =>
+      (CONF_RANK[b.confidence] - CONF_RANK[a.confidence]) || String(b.updated).localeCompare(String(a.updated)));
+    // 每个 owner 在同一节里最多占 60%，避免某次批量导入挤掉其他来源
+    const pick = (k, n) => {
+      const pool = ordered.filter((i) => i.kind === k);
+      const cap = Math.max(1, Math.ceil(n * 0.6));
+      const out = [];
+      const per = new Map();
+      for (const i of pool) {
+        if (out.length >= n) break;
+        const c = per.get(i.owner) || 0;
+        if (c >= cap) continue;
+        out.push(i); per.set(i.owner, c + 1);
+      }
+      for (const i of pool) {
+        if (out.length >= n) break;
+        if (!out.includes(i)) out.push(i);
+      }
+      return out;
+    };
+    const by = (k, n) => pick(k, n);
     const facts = by('facts', 6);
     const prefs = by('preferences', 4);
     const decisions = by('decisions', 5);
@@ -792,11 +813,12 @@ export class MemoryStore {
 
     const line = (i) => `- ${i.title}：${i.summary}（${i.updated.slice(0, 10)} · ${i.id.slice(-6)}）`;
 
+    // 顺序即优先级：预算不够时先保住事实与决策
     const sections = [
       ['## 生效事实', facts],
+      ['## 最近决策', decisions],
       ['## 偏好与约定', prefs],
       ['## 关键实体', entities],
-      ['## 最近决策', decisions],
     ];
 
     let out = head;

@@ -48,7 +48,12 @@
 - [ ] 接通 Codex
 - [ ] 导入 OpenClaw/Hermes 历史并蒸馏
 
-## v0.7 — 历史迁移（P3）
+## v0.7 — 历史迁移（已完成）
+
+- [x] Hermes 155 会话 → 86 条记忆（子代理并行提炼）
+- [x] 证据链：每条带 session id
+- [x] 去重与字段校验
+
 
 - [ ] `memhub import`：从 JSONL 会话抽取候选记忆（含 anchors/valid_from 推断）
 - [ ] 子代理批量蒸馏 imported-agents（48,725 条 → 目标 100–300 条）

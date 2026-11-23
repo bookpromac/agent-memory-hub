@@ -118,7 +118,7 @@ try {
         break;
       }
       if (sub !== 'sync') { print({ error: `未知子命令 ${sub}（可用：sync / ingest）` }); process.exitCode = 1; break; }
-      const digest = store.digest({ maxBytes: Number(args['max-bytes'] || 4096) });
+      const digest = store.digest({ maxBytes: Number(args['max-bytes'] || 6144) });
       // 摘要文件始终刷新（log 用户/其他 agent 直接读它）
       fs.writeFileSync(path.join(store.home, 'DIGEST.md'), digest);
       const emb = args['no-embed'] ? null : embedDigest(digest, path.resolve(args.agents || 'AGENTS.md'));
@@ -131,7 +131,7 @@ try {
       break;
     }
     case 'digest': {
-      const text = store.digest({ maxBytes: Number(args['max-bytes'] || 4096) });
+      const text = store.digest({ maxBytes: Number(args['max-bytes'] || 6144) });
       if (args['dry-run']) { process.stdout.write(text); break; }
       const out = args.out || path.join(store.home, 'DIGEST.md');
       fs.writeFileSync(out, text);
