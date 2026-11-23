@@ -8,7 +8,7 @@ LOG="$MEMORY_HOME/.memory/sync.log"
 mkdir -p "$(dirname "$LOG")"
 {
   echo "=== $(date '+%F %T') dsh sync ==="
-  /opt/homebrew/bin/node "$HUB/src/cli.mjs" dsh sync --no-embed --min-age 30
+  /opt/homebrew/bin/node "$HUB/src/cli.mjs" dsh sync --min-age 30 --agents "$MEMORY_HOME/AGENTS.md"
   /opt/homebrew/bin/node "$HUB/src/cli.mjs" verify | tail -3
 } >> "$LOG" 2>&1
 tail -200 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"

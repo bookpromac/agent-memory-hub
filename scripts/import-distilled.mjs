@@ -3,8 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { MemoryStore } from '../src/store.mjs';
 
-const dir = process.argv[2] || '/tmp/mem-distill';
-const files = fs.readdirSync(dir).filter((f) => /^out-batch-\d+\.json$/.test(f)).sort();
+const input = process.argv[2] || '/tmp/mem-distill';
+const agent = process.argv[3] || 'hermes';
+const isFile = fs.existsSync(input) && fs.statSync(input).isFile();
+const dir = isFile ? path.dirname(input) : input;
+const files = isFile ? [path.basename(input)] : fs.readdirSync(dir).filter((f) => /^out-batch-\d+\.json$/.test(f)).sort();
 if (!files.length) { console.error('没有找到 out-batch-*.json'); process.exit(1); }
 
 let all = [];
@@ -54,7 +57,7 @@ for (const m of valid) {
 
 console.log(`原始 ${all.length} · 有效 ${valid.length} · 去重后 ${kept.length}`);
 
-const store = new MemoryStore(process.env.HOME + '/Memory', { agent: 'hermes' });
+const store = new MemoryStore(process.env.HOME + '/Memory', { agent });
 let written = 0;
 let duplicate = 0;
 for (const m of kept) {
@@ -63,9 +66,9 @@ for (const m of kept) {
       kind: m.kind,
       title: m.title.slice(0, 60),
       body: m.body,
-      tags: [...new Set([...(m.tags || []), 'imported', 'hermes'])].slice(0, 6),
+      tags: [...new Set([...(m.tags || []), 'imported', agent])].slice(0, 6),
       confidence: m.confidence,
-      source: { agent: 'hermes', session: m.evidence || '', trigger: 'history-distill' },
+      source: { agent, session: m.evidence || '', trigger: 'history-distill' },
     });
     if (res.duplicate) duplicate++; else written++;
   } catch (e) {

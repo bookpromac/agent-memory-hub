@@ -2,6 +2,7 @@
 // 命令行入口：memhub <command>
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import readline from 'node:readline';
 import { MemoryStore, KINDS } from './store.mjs';
 import { listen } from './http.mjs';
@@ -33,6 +34,7 @@ function readBody(args) {
 
 function print(obj) { process.stdout.write(`${JSON.stringify(obj, null, 2)}\n`); }
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const cmd = process.argv[2];
 const args = parseArgs(process.argv.slice(3));
 const store = cmd ? new MemoryStore(undefined, { agent: args.agent || process.env.MEMORY_AGENT }) : null;
@@ -151,6 +153,13 @@ try {
       const digest = store.digest({ maxBytes: Number(args['max-bytes'] || 6144) });
       // 摘要文件始终刷新（log 用户/其他 agent 直接读它）
       fs.writeFileSync(path.join(store.home, 'DIGEST.md'), digest);
+      // 可选：把「约定模板 + 摘要」写成一份 AGENTS.md（用于符号链接注入）
+      if (args.agents) {
+        const tpl = path.join(__dirname, '..', 'templates', 'AGENTS.template.md');
+        const head = fs.existsSync(tpl) ? fs.readFileSync(tpl, 'utf8') : '# 工作区约定\n';
+        const block = `\n<!-- memory-hub:digest:start -->\n<!-- 以下摘要由 memhub dsh sync 自动生成，勿手改 -->\n\n${digest}\n<!-- memory-hub:digest:end -->\n`;
+        fs.writeFileSync(path.resolve(args.agents), head.trimEnd() + block);
+      }
       const emb = args['no-embed'] ? null : embedDigest(digest, path.resolve(args.agents || 'AGENTS.md'));
       const ing = args['no-ingest'] ? null : ingest(store, { minAgeMinutes: Number(args['min-age'] ?? 30), limit: Number(args.limit || 50) });
       print({

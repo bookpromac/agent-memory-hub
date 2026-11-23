@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.9.2 — 2026-11-23
+
+### 会话注入（T-003）
+- `memhub dsh sync --agents <path>`：生成「约定模板 + 记忆摘要」的 AGENTS.md
+- 工作区 `AGENTS.md` 改为指向 `~/Memory/AGENTS.md` 的符号链接；每 6 小时由定时任务刷新
+- 效果：新会话自动携带摘要，无需 agent 主动读取
+
+### 历史导入（T-012）
+- OpenClaw 16 个 agent / 1481 会话提炼出 **34 条**记忆，写入 `agents/openclaw`
+- 与 Hermes 的 86 条交叉查重，无重复主题
+- 记忆库总量 103 → **138 条**
+
+### 文档（T-011）
+- 新增 `README.en.md`（286 行英文版）
+
 ## v0.9.1 — 2026-11-23
 
 ### 备份（T-008）
