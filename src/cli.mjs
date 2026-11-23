@@ -5,6 +5,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { MemoryStore, KINDS } from './store.mjs';
 import { listen } from './http.mjs';
+import { ingest, embedDigest } from './dsh.mjs';
 import { ADAPTERS, detectAdapters, renderSetup, getAdapter } from './adapters.mjs';
 
 function parseArgs(argv) {
@@ -88,6 +89,25 @@ try {
     }
     case 'forget': {
       print(store.forget(args._[0], args.reason || ''));
+      break;
+    }
+    case 'dsh': {
+      const sub = args._[0] || 'sync';
+      if (sub === 'ingest') {
+        print(ingest(store, { minAgeMinutes: Number(args['min-age'] || 0), limit: Number(args.limit || 50) }));
+        break;
+      }
+      if (sub !== 'sync') { print({ error: `未知子命令 ${sub}（可用：sync / ingest）` }); process.exitCode = 1; break; }
+      const digest = store.digest({ maxBytes: Number(args['max-bytes'] || 4096) });
+      // 摘要文件始终刷新（log 用户/其他 agent 直接读它）
+      fs.writeFileSync(path.join(store.home, 'DIGEST.md'), digest);
+      const emb = args['no-embed'] ? null : embedDigest(digest, path.resolve(args.agents || 'AGENTS.md'));
+      const ing = args['no-ingest'] ? null : ingest(store, { minAgeMinutes: Number(args['min-age'] ?? 30), limit: Number(args.limit || 50) });
+      print({
+        digest_bytes: Buffer.byteLength(digest),
+        embedded: emb,
+        ingested: ing && { scanned: ing.scanned, written: ing.written, revised: ing.revised, skipped: ing.skipped },
+      });
       break;
     }
     case 'digest': {
@@ -210,6 +230,7 @@ try {
         + '  memhub migrate [--yes]        # v1 → v2 升级（默认 dry-run，自动备份）\n'
         + '  memhub gc [--older-than 30] [--yes]   # 清理墓碑与旧修订（默认 dry-run）\n'
         + '  memhub digest [--dry-run] [--max-bytes 4096]   # 生成常驻读取摘要\n'
+        + '  memhub dsh sync [--no-embed] [--no-ingest]     # 接管 DSH：摘要嵌入 AGENTS.md + 会话沉淀\n'
         + '  memhub serve [--port 7710]    # 启动本机 HTTP 守护进程\n'
         + '  memhub adapters [list|detect|show <id>]   # 各智能体的接入方式\n'
         + '  memhub import <file.jsonl> --agent <name> [--limit 200]\n'

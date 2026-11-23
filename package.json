@@ -26,7 +26,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node test/smoke.mjs && node test/http.test.mjs",
+    "test": "node test/smoke.mjs && node test/http.test.mjs && node test/dsh.test.mjs",
     "mcp": "node src/mcp.mjs",
     "doctor": "node src/cli.mjs doctor"
   },
