@@ -66,14 +66,15 @@ env = { MEMORY_HOME = "${memoryHome}" }`,
     protocol: 'mcp',
     note: 'openclaw mcp add 注册为 OpenClaw 管理的 MCP 服务器（工具名 memory__*）',
     detect: () => homePath('.openclaw', 'openclaw.json'),
-    setup: ({ memoryHome }) => `openclaw mcp add memory \\
+    setup: ({ memoryHome }) => `# 服务名用 memhub，避免与 OpenClaw 内置 memory_search 混淆
+openclaw mcp add memhub \\
   --command /opt/homebrew/bin/node \\
   --arg "${MCP_ENTRY}" \\
   --env MEMORY_HOME="${memoryHome}" \\
   --env MEMORY_AGENT=openclaw
 
 # 验证
-openclaw mcp probe memory
+openclaw mcp probe memhub
 # 指令文件写到 ~/.openclaw/workspace/AGENTS.md（要求先读 DIGEST、用 memory__mem_* 工具）`,
   },
   {

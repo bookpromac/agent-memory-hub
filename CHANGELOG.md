@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.9.5 — 2026-11-23
+
+### OpenClaw 本地模型端到端
+- 用本机 Ollama（qwen3.5:4b-mlx）跑通：OpenClaw → MCP → 记忆库
+- 读：`memhub__mem_search` 命中 10 条（跨 hermes/openclaw/dsh）
+- 写：`memhub__mem_write` 写入 `agents/openclaw/.../OpenClaw-write-test-EV6ZCP.md`，DSH 侧 MCP 立即可读
+- MCP 服务器改名为 `memhub`：避免与 OpenClaw 内置 `memory_search` 冲突（模型会优先调内置工具）
+- 踩坑：`tool_search` 一次只返回部分工具，需用精确查询词（如 `mem_write`）才会暴露写工具
+
 ## v0.9.4 — 2026-11-23
 
 ### OpenClaw 接口

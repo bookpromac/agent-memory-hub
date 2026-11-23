@@ -1,6 +1,6 @@
 {
   "name": "memory-hub-mcp",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "跨智能体记忆中枢：Markdown 事实源 + MCP 协议，任何 agent 都能读写同一份长期记忆",
   "type": "module",
   "license": "MIT",
