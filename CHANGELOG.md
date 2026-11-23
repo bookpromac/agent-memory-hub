@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.7.0 — 2026-11-23
+
+### 架构变更（破坏性）
+- **每个智能体一个独立 git 仓库**：`~/Memory/agents/<id>/memories`，各自有链、各自可备份
+- **hub 目录**：聚合索引移到 `hub/index.sqlite`，新增 `owner / repo_path / content_hash / duplicate_of`
+- **shared 投影**：`shared/` 由 hub 生成，其他 agent 只读它，读不到别人的仓库
+- **写隔离**：`MEMORY_AGENT` 决定身份，越权写被拒（MCP 实测）
+- **注册表**：`hub/registry.json` 记录每个 agent 的可见性与读范围
+
+### 新增命令
+- `memhub agents [list|register <id>]`
+- `memhub migrate-multi [--yes]`
+- `memhub project`
+
+### 修复
+- 迁移后链头丢失 → 写入回退 + 重建收敛 + `verify` 增加 `multiple-roots` 检测
+- `digest` 支持按 owner 范围与 bare 模式（供 shared 摘要复用）
+
 ## v0.6.1 — 2026-11-23
 
 ### 接入

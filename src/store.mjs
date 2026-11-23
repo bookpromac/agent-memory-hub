@@ -8,7 +8,12 @@ import { DatabaseSync } from 'node:sqlite';
 
 export const KINDS = ['facts', 'preferences', 'entities', 'decisions', 'episodes'];
 export const CONFIDENCE = ['high', 'medium', 'low'];
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
+
+/** 某个 agent 的仓库根目录 */
+export function agentRoot(home, agent) {
+  return path.join(home, 'agents', agent);
+}
 
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
@@ -219,11 +224,16 @@ export function assertNoSecrets(text) {
 // ---------- 存储 ----------
 
 export class MemoryStore {
-  constructor(home = memoryHome()) {
+  constructor(home = memoryHome(), { agent } = {}) {
     this.home = home;
-    this.memDir = path.join(home, 'memories');
-    this.dbPath = path.join(home, 'index.sqlite');
-    fs.mkdirSync(this.memDir, { recursive: true });
+    this.agent = agent || process.env.MEMORY_AGENT || 'default';
+    this.agentsDir = path.join(home, 'agents');
+    this.hubDir = path.join(home, 'hub');
+    this.registryPath = path.join(this.hubDir, 'registry.json');
+    this.memDir = path.join(this.agentsDir, this.agent, 'memories');
+    this.dbPath = path.join(this.hubDir, 'index.sqlite');
+    // 不预建 agent 仓库：只在真正写入时创建，避免空目录
+    fs.mkdirSync(this.hubDir, { recursive: true });
     this.db = new DatabaseSync(this.dbPath);
     this.db.exec('PRAGMA journal_mode = WAL');
     this.db.exec('PRAGMA busy_timeout = 5000');
@@ -265,6 +275,10 @@ export class MemoryStore {
         prev_hash TEXT,
         hash TEXT,
         status TEXT,
+        owner TEXT,
+        repo_path TEXT,
+        content_hash TEXT,
+        duplicate_of TEXT,
         tombstoned INTEGER NOT NULL DEFAULT 0
       );
       CREATE TABLE IF NOT EXISTS links (
@@ -287,6 +301,28 @@ export class MemoryStore {
 
   close() { this.db.close(); }
 
+  registry() {
+    try {
+      if (!fs.existsSync(this.registryPath)) return { agents: {} };
+      return JSON.parse(fs.readFileSync(this.registryPath, 'utf8'));
+    } catch { return { agents: {} }; }
+  }
+
+  /** 可见 owner：自己 + 声明为 shared 的其他 agent；没有注册表时返回 null（不过滤） */
+  visibleOwners() {
+    const reg = this.registry();
+    const names = Object.keys(reg.agents || {});
+    if (!names.length) return null;
+    const shared = names.filter((a) => (reg.agents[a].visibility || 'shared') === 'shared');
+    return [...new Set([this.agent, ...shared])];
+  }
+
+  #ownerFilter(alias = 'n') {
+    const owners = this.visibleOwners();
+    if (!owners) return { sql: '', params: [] };
+    return { sql: ` AND ${alias}.owner IN (${owners.map(() => '?').join(',')})`, params: owners };
+  }
+
   #meta(key, fallback = null) {
     const r = this.db.prepare('SELECT value FROM meta WHERE key = ?').get(key);
     return r ? r.value : fallback;
@@ -301,14 +337,19 @@ export class MemoryStore {
     this.db.prepare(
       `INSERT OR REPLACE INTO notes
        (id, path, kind, title, created, updated, valid_from, valid_to, confidence, review_at,
-        source_agent, source_session, anchors, prev_hash, hash, status, tombstoned)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        source_agent, source_session, anchors, prev_hash, hash, status, owner, repo_path, content_hash, duplicate_of, tombstoned)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     ).run(
       id, file, meta.kind, meta.title, meta.created, meta.updated,
       meta.valid_from || null, meta.valid_to || null,
       meta.confidence, meta.review_at || null,
       meta.source?.agent || null, meta.source?.session || null,
-      (meta.anchors || []).join(' '), prev_hash || null, hash || null, meta.status || 'active', tombstoned,
+      (meta.anchors || []).join(' '), prev_hash || null, hash || null, meta.status || 'active',
+      meta.owner || meta.source?.agent || null,
+      meta.repo_path || null,
+      sha256(normalizeBody(body)),
+      meta.duplicate_of || null,
+      tombstoned,
     );
 
     this.db.prepare('DELETE FROM observations WHERE doc_id = ?').run(id);
@@ -338,6 +379,9 @@ export class MemoryStore {
     if (!body || !String(body).trim()) throw new Error('body 不能为空');
     if (!CONFIDENCE.includes(confidence)) throw new Error(`confidence 必须是 ${CONFIDENCE.join('/')}`);
     if (!source || !source.agent) throw new Error('source.agent 必填：没有出处的记忆不可信');
+    if (this.agent !== 'default' && this.agent !== source.agent) {
+      throw new Error(`身份不匹配：当前 agent=${this.agent}，不能写入 ${source.agent} 的仓库`);
+    }
     assertNoSecrets(`${title}\n${body}`);
 
     const norm = normalizeBody(body);
@@ -350,23 +394,34 @@ export class MemoryStore {
 
     const now = new Date().toISOString();
     const id = ulid();
-    const prev_hash = this.#meta('chain_head', '');
+    const chainKey = `chain_head:${source.agent}`;
+    let prev_hash = this.#meta(chainKey, '');
+    if (!prev_hash) {
+      // 迁移/重建后链头可能缺失：回退到该 agent 最新一条的 hash
+      const last = this.db.prepare(
+        'SELECT hash FROM notes WHERE owner = ? AND hash IS NOT NULL ORDER BY created DESC LIMIT 1',
+      ).get(source.agent);
+      prev_hash = last?.hash || '';
+    }
     const anchorList = (anchors && anchors.length ? anchors : deriveAnchors(title, tags)).slice(0, 3);
     const hash = noteHash({ prev_hash, id, created: now, agent: source.agent, body });
-    const dir = path.join(this.memDir, kind, now.slice(0, 7));
+    const agentMemDir = path.join(this.agentsDir, source.agent, 'memories');
+    const dir = path.join(agentMemDir, kind, now.slice(0, 7));
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, `${slugify(title)}-${id.slice(-6)}.md`);
     const meta = {
       id, kind, title, created: now, updated: now,
       valid_from: valid_from || now.slice(0, 10), tags, anchors: anchorList,
       confidence, source, links, prev_hash, hash, schema: SCHEMA_VERSION,
+      owner: source.agent,
+      repo_path: path.relative(this.home, agentMemDir),
       ...(supersedes ? { supersedes } : {}),
     };
     writeAtomic(file, serialize({ meta, body }));
     this.db.exec('BEGIN IMMEDIATE');
     this.#indexNote({ id, file, meta, body, hash, prev_hash });
-    this.#setMeta('chain_head', hash);
-    this.#setMeta('chain_len', Number(this.#meta('chain_len', 0)) + 1);
+    this.#setMeta(chainKey, hash);
+    this.#setMeta(`chain_len:${source.agent}`, Number(this.#meta(`chain_len:${source.agent}`, 0)) + 1);
     this.db.exec('COMMIT');
     return { id, path: file, hash, prev_hash, duplicate: false };
   }
@@ -409,10 +464,12 @@ export class MemoryStore {
       ).all(`%${q}%`, docLimit);
     }
 
+    const of = this.#ownerFilter('n');
     const byDoc = new Map();
     for (const h of hits) {
       const n = this.db.prepare('SELECT * FROM notes WHERE id = ?').get(h.doc_id);
       if (!n || n.tombstoned || n.status === 'superseded') continue;
+      if (of.params.length && !of.params.includes(n.owner)) continue;
       if (kinds.length && !kinds.includes(n.kind)) continue;
       if (since && n.updated < since) continue;
       const arr = byDoc.get(h.doc_id) || { note: n, hits: [] };
@@ -425,17 +482,18 @@ export class MemoryStore {
       .slice(0, limit)
       .map(({ note, hits: hs }) => ({
         id: note.id, title: note.title, kind: note.kind, confidence: note.confidence,
-        updated: note.updated, anchors: (note.anchors || '').split(' ').filter(Boolean),
+        owner: note.owner, updated: note.updated,
+        anchors: (note.anchors || '').split(' ').filter(Boolean),
         hits: hs, excerpt: hs[0]?.text?.slice(0, 160) || '',
       }));
 
     if (!results.length) {
       // 短词或未命中：标题回退
       results = this.db.prepare(
-        `SELECT id, title, kind, confidence, updated, anchors FROM notes
+        `SELECT id, title, kind, confidence, updated, anchors, owner FROM notes
          WHERE tombstoned = 0 AND (status IS NULL OR status = 'active') AND title LIKE ? LIMIT ?`,
       ).all(`%${q}%`, limit).map((n) => ({
-        id: n.id, title: n.title, kind: n.kind, confidence: n.confidence,
+        id: n.id, title: n.title, kind: n.kind, confidence: n.confidence, owner: n.owner,
         updated: n.updated, anchors: (n.anchors || '').split(' ').filter(Boolean),
         hits: [], excerpt: n.title,
       }));
@@ -457,10 +515,11 @@ export class MemoryStore {
     const params = [];
     if (since) { where.push('updated >= ?'); params.push(since); }
     if (kinds.length) { where.push(`kind IN (${kinds.map(() => '?').join(',')})`); params.push(...kinds); }
+    const of = this.#ownerFilter('notes');
     return this.db.prepare(
-      `SELECT id, title, kind, confidence, updated, anchors FROM notes
-       WHERE ${where.join(' AND ')} ORDER BY updated DESC LIMIT ?`,
-    ).all(...params, limit).map((n) => ({ ...n, anchors: (n.anchors || '').split(' ').filter(Boolean) }));
+      `SELECT id, title, kind, confidence, updated, anchors, owner FROM notes
+       WHERE ${where.join(' AND ')}${of.sql} ORDER BY updated DESC LIMIT ?`,
+    ).all(...params, ...of.params, limit).map((n) => ({ ...n, anchors: (n.anchors || '').split(' ').filter(Boolean) }));
   }
 
   /** 修订 = 旧条目标记 superseded + 追加一条新记忆（保持链式追加，不破坏审计） */
@@ -518,13 +577,20 @@ export class MemoryStore {
     let count = 0;
     const files = [];
     const walk = (dir) => {
+      if (!fs.existsSync(dir)) return;
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, entry.name);
         if (entry.isDirectory()) { walk(p); continue; }
         if (entry.name.endsWith('.md')) files.push(p);
       }
     };
-    walk(this.memDir);
+    // 新结构：每个 agent 一个仓库；同时兼容旧的 memories/
+    if (fs.existsSync(this.agentsDir)) {
+      for (const agent of fs.readdirSync(this.agentsDir)) {
+        walk(path.join(this.agentsDir, agent, 'memories'));
+      }
+    }
+    walk(path.join(this.home, 'memories'));
 
     for (const file of files) {
       const raw = fs.readFileSync(file, 'utf8');
@@ -538,11 +604,20 @@ export class MemoryStore {
     }
 
     // 恢复链头：找出没有任何笔记以它的 hash 作为 prev_hash 的那条
-    const rows = this.db.prepare('SELECT hash, prev_hash FROM notes WHERE hash IS NOT NULL').all();
-    const referenced = new Set(rows.map((r) => r.prev_hash).filter(Boolean));
-    const heads = rows.filter((r) => !referenced.has(r.hash));
-    if (heads.length === 1) this.#setMeta('chain_head', heads[0].hash);
-    this.#setMeta('chain_len', rows.length);
+    const rows = this.db.prepare('SELECT owner, hash, prev_hash FROM notes WHERE hash IS NOT NULL').all();
+    const byOwner = new Map();
+    for (const r of rows) {
+      if (!byOwner.has(r.owner)) byOwner.set(r.owner, []);
+      byOwner.get(r.owner).push(r);
+    }
+    for (const [owner, list] of byOwner) {
+      const latest = list
+        .map((r) => this.db.prepare('SELECT hash, created FROM notes WHERE hash = ?').get(r.hash))
+        .filter(Boolean)
+        .sort((a, b) => String(b.created).localeCompare(String(a.created)))[0];
+      if (latest) this.#setMeta(`chain_head:${owner}`, latest.hash);
+      this.#setMeta(`chain_len:${owner}`, list.length);
+    }
     this.#setMeta('schema_version', SCHEMA_VERSION);
     return count;
   }
@@ -566,6 +641,15 @@ export class MemoryStore {
         problems.push({ level: 'error', code: 'missing-predecessor', id: r.id });
       }
     }
+    // 每个 owner 必须恰好一条根（prev_hash 为空），否则链被割裂
+    const roots = new Map();
+    for (const r of rows) {
+      if (!r.prev_hash) roots.set(r.owner, (roots.get(r.owner) || 0) + 1);
+    }
+    for (const [owner, n] of roots) {
+      if (n > 1) problems.push({ level: 'error', code: 'multiple-roots', owner, count: n });
+    }
+
     const legacy = this.db.prepare('SELECT COUNT(*) c FROM notes WHERE hash IS NULL').get().c;
     return { ok: problems.length === 0, checked, legacy, problems };
   }
@@ -574,13 +658,17 @@ export class MemoryStore {
   migrate({ apply = false } = {}) {
     const files = [];
     const walk = (dir) => {
+      if (!fs.existsSync(dir)) return;
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, entry.name);
         if (entry.isDirectory()) { walk(p); continue; }
         if (entry.name.endsWith('.md')) files.push(p);
       }
     };
-    walk(this.memDir);
+    if (fs.existsSync(this.agentsDir)) {
+      for (const agent of fs.readdirSync(this.agentsDir)) walk(path.join(this.agentsDir, agent, 'memories'));
+    }
+    walk(path.join(this.home, 'memories'));
 
     const pending = files
       .map((file) => ({ file, raw: fs.readFileSync(file, 'utf8') }))
@@ -614,13 +702,19 @@ export class MemoryStore {
     const problems = [];
     const files = [];
     const walk = (dir) => {
+      if (!fs.existsSync(dir)) return;
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, entry.name);
         if (entry.isDirectory()) { walk(p); continue; }
         if (entry.name.endsWith('.md')) files.push(p);
       }
     };
-    walk(this.memDir);
+    if (fs.existsSync(this.agentsDir)) {
+      for (const agent of fs.readdirSync(this.agentsDir)) {
+        walk(path.join(this.agentsDir, agent, 'memories'));
+      }
+    }
+    walk(path.join(this.home, 'memories'));
 
     const seenBody = new Map();
     const ids = new Set();
@@ -665,12 +759,14 @@ export class MemoryStore {
    * 生成「常驻读取」摘要：给智能体每次会话必读的几 KB 内容。
    * 只读，不写库；由 CLI 决定是否落盘。
    */
-  digest({ maxBytes = 4096, now = new Date() } = {}) {
+  digest({ maxBytes = 4096, now = new Date(), owners = null, bare = false } = {}) {
+    const scope = owners || this.visibleOwners();
+    const ownerSql = scope ? ` AND owner IN (${scope.map(() => '?').join(',')})` : '';
     const rows = this.db.prepare(
-      `SELECT id, kind, title, updated, anchors FROM notes
-       WHERE tombstoned = 0 AND (status IS NULL OR status = 'active')
+      `SELECT id, kind, title, updated, anchors, owner FROM notes
+       WHERE tombstoned = 0 AND (status IS NULL OR status = 'active')${ownerSql}
        ORDER BY updated DESC`,
-    ).all();
+    ).all(...(scope || []));
 
     const items = rows.map((r) => {
       const { body } = parseFrontmatter(fs.readFileSync(
@@ -686,10 +782,10 @@ export class MemoryStore {
     const entities = by('entities', 3);
     const due = items.filter((i) => i.kind === 'decisions' && i.updated < new Date(Date.now() - 180 * 86400000).toISOString()).slice(0, 3);
 
-    const head = [
+    const head = bare ? '' : [
       '# 长期记忆摘要（自动生成，勿手改）',
       '',
-      `> 生成于 ${now.toISOString().slice(0, 16).replace('T', ' ')} · 库中共 ${items.length} 条 · 权威源：~/Memory/memories/`,
+      `> 生成于 ${now.toISOString().slice(0, 16).replace('T', ' ')} · 库中共 ${items.length} 条 · 权威源：~/Memory/agents/<agent>/memories/`,
       '> 需要细节时用 mem_search / 读对应文件；要写入用 mem_write。',
       '',
     ].join('\n');

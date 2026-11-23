@@ -213,3 +213,54 @@ agent 调用 mem_write
 | P4 | 自动 git 提交 + 重建脚本 | 1 h | 每日一次提交，可单独 checkout |
 
 总计约 **8 小时**，可分两天。
+
+---
+
+## 十四、实施结果（2026-11-23 已上线）
+
+### 实际结构
+
+```
+~/Memory/
+├── agents/
+│   ├── deepseek-harness/   （10 条 → 迁移后 11 条，独立 git）
+│   └── cli-test/           （1 条，独立 git）
+├── hub/
+│   ├── index.sqlite         owner/repo_path/content_hash/duplicate_of 已加
+│   └── registry.json        两个 agent 均 visibility=shared
+├── shared/
+│   ├── DIGEST.md            12 条聚合摘要
+│   ├── memories/            按 agent 分目录的只读副本
+│   └── manifest.json        counts / copied / excludedPrivate
+└── backups/pre-multiagent-20261123-073545.tar.gz
+```
+
+### 验证结果
+
+| 检查 | 结果 |
+|---|---|
+| 写自己仓库 | ✅ 路径 `agents/deepseek-harness/memories/...` |
+| 越权写被拒 | ✅ MCP 返回「身份不匹配：当前 agent=deepseek-harness，不能写入 claude-code 的仓库」 |
+| private 不可见 | ✅ 测试覆盖（beta 设 private 后 alpha 搜不到） |
+| shared 投影 | ✅ 12 条，manifest 记录来源与排除数 |
+| 迁移幂等 | ✅ dry-run 报告 11 条，`--yes` 执行后旧目录清空 |
+| 各仓库 git | ✅ 每个独立提交，互不影响 |
+
+### 踩到的坑
+
+1. **迁移后链头丢失**
+   旧数据没有 `owner` 字段，重建时按 `source.agent` 回填；但链头恢复逻辑只在"恰好一个根"时写入，导致多条根时新写入变成第二条链的起点。
+   修复：`writeNote` 在链头缺失时回退到该 owner 最新一条的 hash；`rebuild` 改为取最新记忆作为链头；`verify` 新增 `multiple-roots` 检测。
+
+2. **launchd 的 TCC 限制仍在**
+   定时任务只跑 `dsh sync --no-embed`（不触碰 `~/Documents`），才不会被挂起。
+
+### 命令
+
+```bash
+memhub agents list                      # 各仓库条数与注册状态
+memhub agents register <id>             # 登记新 agent
+memhub migrate-multi [--yes]            # 旧布局迁移
+memhub project                          # 重建 shared/ 投影
+MEMORY_AGENT=<id> memhub ...            # 指定身份
+```

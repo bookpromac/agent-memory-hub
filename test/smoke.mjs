@@ -25,7 +25,7 @@ assert.equal(w.duplicate, false);
 // 2. 文件结构
 const raw = fs.readFileSync(w.path, 'utf8');
 assert.match(raw, /^---\n/);
-assert.match(raw, /schema: 2/);
+assert.match(raw, /schema: 3/);
 assert.match(raw, /valid_from: \d{4}-\d{2}-\d{2}/);
 assert.match(raw, /anchors: \[/);
 assert.match(raw, /hash: [0-9a-f]{64}/);
@@ -116,7 +116,7 @@ assert.match(dg, /输出用中文/);
 
 // 15. doctor 干净；坏文件能发现
 assert.equal(store.doctor().ok, true, JSON.stringify(store.doctor().problems));
-const bad = path.join(tmp, 'memories', 'facts', '2026-11', 'broken.md');
+const bad = path.join(tmp, 'agents', 'dsh', 'memories', 'facts', '2026-11', 'broken.md');
 fs.mkdirSync(path.dirname(bad), { recursive: true });
 fs.writeFileSync(bad, '---\nkind: facts\ntitle: 坏文件\n---\n没有 id 和出处\n');
 const d = store.doctor();
@@ -153,7 +153,7 @@ assert.equal(mstore.migrate().pending, 1, 'dry-run 应报告 1 条待迁移');
 const mres = mstore.migrate({ apply: true });
 assert.equal(mres.migrated, 1);
 const migrated = fs.readFileSync(oldFile, 'utf8');
-assert.match(migrated, /schema: 2/);
+assert.match(migrated, /schema: 3/);
 assert.match(migrated, /hash: [0-9a-f]{64}/);
 assert.ok(fs.existsSync(mres.backup), '应生成备份目录');
 assert.equal(mstore.verify().ok, true);

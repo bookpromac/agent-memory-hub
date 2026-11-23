@@ -6,6 +6,7 @@ import readline from 'node:readline';
 import { MemoryStore, KINDS } from './store.mjs';
 import { listen } from './http.mjs';
 import { ingest, embedDigest } from './dsh.mjs';
+import { listAgents, ensureAgent, migrateMulti, project } from './hub.mjs';
 import { ADAPTERS, detectAdapters, renderSetup, getAdapter } from './adapters.mjs';
 
 function parseArgs(argv) {
@@ -33,7 +34,7 @@ function print(obj) { process.stdout.write(`${JSON.stringify(obj, null, 2)}\n`);
 
 const cmd = process.argv[2];
 const args = parseArgs(process.argv.slice(3));
-const store = cmd ? new MemoryStore() : null;
+const store = cmd ? new MemoryStore(undefined, { agent: args.agent || process.env.MEMORY_AGENT }) : null;
 
 try {
   switch (cmd) {
@@ -89,6 +90,25 @@ try {
     }
     case 'forget': {
       print(store.forget(args._[0], args.reason || ''));
+      break;
+    }
+    case 'agents': {
+      const sub = args._[0] || 'list';
+      if (sub === 'register') {
+        const id = args._[1];
+        if (!id) { print({ error: '用法：memhub agents register <id> [--visibility shared|private]' }); process.exitCode = 1; break; }
+        print(ensureAgent(store, id, { displayName: args.name || id, visibility: args.visibility || 'shared' }));
+        break;
+      }
+      print(listAgents(store));
+      break;
+    }
+    case 'migrate-multi': {
+      print(migrateMulti(store, { apply: Boolean(args.yes || args.apply) }));
+      break;
+    }
+    case 'project': {
+      print(project(store, { owners: args.owners ? String(args.owners).split(',') : null }));
       break;
     }
     case 'dsh': {
@@ -233,6 +253,9 @@ try {
         + '  memhub dsh sync [--no-embed] [--no-ingest]     # 接管 DSH：摘要嵌入 AGENTS.md + 会话沉淀\n'
         + '  memhub serve [--port 7710]    # 启动本机 HTTP 守护进程\n'
         + '  memhub adapters [list|detect|show <id>]   # 各智能体的接入方式\n'
+        + '  memhub agents [list|register <id>]        # 多仓库：agent 仓库总览/登记\n'
+        + '  memhub migrate-multi [--yes]              # 迁移旧 memories/ 到 agents/<id>/\n'
+        + '  memhub project                            # 重建 shared/ 只读投影\n'
         + '  memhub import <file.jsonl> --agent <name> [--limit 200]\n'
         + '  memhub rebuild | stats | path\n',
       );

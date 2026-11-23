@@ -54,6 +54,14 @@
 - [ ] 子代理批量蒸馏 imported-agents（48,725 条 → 目标 100–300 条）
 - [ ] 人工审核工作流（staging → accept/reject）
 
+## v0.7 — 多仓库架构（已上线）
+
+- [x] 每个 agent 独立仓库（git）
+- [x] hub 聚合索引（owner/repo/content_hash）
+- [x] 写隔离与身份校验
+- [x] shared 只读投影 + manifest
+- [x] 迁移现有 11 条
+
 ## v0.8 — 运维（P4）
 
 - [ ] launchd 每日 `git commit`
